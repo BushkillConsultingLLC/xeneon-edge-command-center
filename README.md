@@ -10,8 +10,10 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 |---|---|
 | **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
 | **Messages** | Your most recent incoming iMessages and texts, with names from Contacts. Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
-| **Now Playing** | Spotify album art, track, progress and big touch controls. Can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. |
-| **Claude** | Live [Claude service status](https://status.claude.com), plus a task card that shows what an AI assistant (or anything else) is working on, fed by a simple JSON file. |
+| **Now Playing** | **Spotify** or **Apple Music**: album art, track, progress and big touch controls. Spotify can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. Apple Music is controlled directly on the Mac, with no account setup. |
+| **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
+
+**Pick what you see.** Every panel can be turned on or off, resized (narrow, medium, wide) and reordered from the settings sheet (the ⚙︎ in the bottom-right corner). Your choices are saved on the Mac.
 
 Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, and nothing is sent anywhere except the services you connect (Spotify, your calendar feeds, Claude's public status page).
 
@@ -28,7 +30,7 @@ Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, 
 1. Download this repository (**Code → Download ZIP**) and unzip it somewhere permanent, for example `~/Applications/Command Center`.
 2. Double-click **Start Command Center.command**. If macOS blocks it, right-click it and choose **Open**.
 3. A Chrome window opens. Drag it onto the Edge and press **Control+Command+F** for full screen.
-4. Tap the **⚙︎** in the top-right of the calendar panel to connect your accounts (below).
+4. Tap the **⚙︎** in the bottom-right corner to choose your panels and connect your accounts (below).
 
 To start it automatically, add **Start Command Center.command** to *System Settings → General → Login Items*.
 
@@ -56,15 +58,31 @@ The dashboard uses Spotify's PKCE sign-in, so no client secret is needed. Tokens
 
 **Preferred speaker:** enter its name exactly as Spotify shows it (for example `office speakers`). Pressing play when nothing is active starts music there. If music starts in the Spotify app on this Mac, it's moved to the speaker automatically, but playback on your phone or elsewhere is never touched. Tap the **Auto** pill to turn this off. Spotify only lists Cast speakers it has seen recently, so if yours isn't found, pick it once in the Spotify app.
 
+### Apple Music
+
+Choose **Apple Music** under *Music* in settings. The first time the dashboard reads the Music app, macOS asks whether Terminal may control Music. Click **OK**. (Missed it? *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**.)
+
 ### Messages
 
 Messages history lives in a protected database. Give access once: *System Settings → Privacy & Security → Full Disk Access →* turn on **Terminal**, then run **Stop** and **Start** again. (The server starts from Terminal, so it inherits Terminal's permission.)
 
 Heads up: the panel shows message text, including verification codes, to anyone who can see your desk.
 
-## Claude status file
+## AI task card
 
-The Claude task card reads `claude-status.json` in the app folder and checks it every 8 seconds. Anything can write it: an AI assistant with access to the folder, a script, a cron job. See `claude-status.example.json`:
+The task card shows what your assistant is doing right now: the request, the last few steps ("Reading index.html", "Editing app.js", "Push the change to GitHub") and whether it is working, waiting on you, or done.
+
+| Assistant | How it connects | What the card shows |
+|---|---|---|
+| **Claude Code** | Double-click **Connect AI Assistant.command**. It adds [hooks](https://code.claude.com/docs/en/hooks) to `~/.claude/settings.json` (backing it up first). | Live: your request, each step as it happens, *Waiting on you* when it needs approval, then *Done* with its closing line |
+| **Codex CLI** | The same installer adds a `notify` line to `~/.codex/config.toml`. | When each turn finishes: *Done* with Codex's last reply. Codex only reports finished turns, so there is no live progress |
+| **ChatGPT app / others** | No connection is possible: these apps don't report what they are doing. | Service status only. Turn the card off in settings |
+
+The card never shows shell commands, file contents or tool output, since it sits on your desk in plain view. Steps are short descriptions only, and Claude Code's own command descriptions are used where available. It does show your request text.
+
+### Writing the card yourself
+
+Anything can drive the card by writing `claude-status.json` in the app folder: a script, a cron job, another tool. It's checked every 8 seconds. See `claude-status.example.json`:
 
 ```json
 {
@@ -86,6 +104,7 @@ The Claude task card reads `claude-status.json` in the app folder and checks it 
 
 - `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888`, rejects requests with any other `Host` header, and refuses write requests from other websites open in the browser (Origin, Fetch-Metadata and JSON content-type checks). Taps that open apps go through the server's `/api/open`, which only opens Messages conversations, calendar days for your configured feeds, and links on known video-meeting hosts.
 - `index.html`: the whole UI in one file, with no build step. Calendars are parsed with [ical.js](https://github.com/kewisch/ical.js) (bundled as `ical.min.js`, MPL-2.0).
+- `ai-status-hook.py`: the Claude Code hook / Codex notify program that writes the task card. Standard library only, never blocks the assistant, always exits 0.
 - **Start / Stop Command Center.command**: start the server and open a dedicated Chrome app window (separate profile at `~/Library/Application Support/CommandCenterChrome`), or stop both.
 
 Logs: `~/Library/Logs/CommandCenter.log`.
@@ -98,6 +117,8 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | A calendar says "Couldn't load" | The link is wrong or not public. Google's *Public URL* only works for public calendars, so use the *Secret address*. |
 | Messages asks for permission | Turn on Full Disk Access for Terminal, then Stop and Start. |
 | Spotify "speaker isn't visible" | Choose the speaker once in the Spotify app, then tap the speaker chip on the dashboard. |
+| Apple Music says "Allow Terminal to control Music" | *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**. |
+| The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
 
 ## Credits and license

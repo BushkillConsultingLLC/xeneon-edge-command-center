@@ -238,6 +238,117 @@ def open_meeting(url):
     return mac_open([url])
 
 
+# ---------------- layout (which panels, which services) ----------------
+PANEL_IDS = ("calendar", "messages", "music", "ai")
+DEFAULT_LAYOUT = {
+    "panels": [{"id": "calendar", "on": True, "size": "m"},
+               {"id": "messages", "on": True, "size": "m"},
+               {"id": "music", "on": True, "size": "l"},
+               {"id": "ai", "on": True, "size": "s"}],
+    "music": "spotify",      # spotify | apple
+    "ai": "claude",          # claude | openai | github | none
+    "aiTask": True,          # show the "what it's working on" card
+}
+
+
+def get_layout():
+    lay = load_config().get("layout") or {}
+    out = json.loads(json.dumps(DEFAULT_LAYOUT))
+    panels = []
+    for p in lay.get("panels", []):
+        if isinstance(p, dict) and p.get("id") in PANEL_IDS and p["id"] not in [x["id"] for x in panels]:
+            panels.append({"id": p["id"], "on": bool(p.get("on", True)),
+                           "size": p.get("size") if p.get("size") in ("s", "m", "l") else "m"})
+    for d in DEFAULT_LAYOUT["panels"]:            # any panel missing from the saved list goes at the end
+        if d["id"] not in [x["id"] for x in panels]:
+            panels.append(dict(d))
+    out["panels"] = panels
+    if lay.get("music") in ("spotify", "apple"):
+        out["music"] = lay["music"]
+    if lay.get("ai") in ("claude", "openai", "github", "none"):
+        out["ai"] = lay["ai"]
+    if "aiTask" in lay:
+        out["aiTask"] = bool(lay["aiTask"])
+    return out
+
+
+# ---------------- Apple Music (controlled locally, no account needed) ----------------
+MUSIC_ART = os.path.join(HOME, "Library", "Caches", "CommandCenter-art")
+
+
+def osa(script, timeout=4):
+    try:
+        r = subprocess.run(["/usr/bin/osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0, r.stdout.strip(), r.stderr.strip()
+    except Exception as e:
+        return False, "", str(e)
+
+
+def music_state():
+    ok, out, _ = osa('application "Music" is running')
+    if not ok:
+        return {"ok": False, "error": "unavailable"}
+    if out != "true":
+        return {"ok": True, "running": False}
+    script = r'''
+tell application "Music"
+  set st to player state as string
+  if st is "stopped" then return "stopped"
+  set t to current track
+  set pos to player position
+  set vol to sound volume
+  return st & "\t" & (name of t) & "\t" & (artist of t) & "\t" & (album of t) & "\t" & (duration of t) & "\t" & pos & "\t" & vol & "\t" & (persistent ID of t)
+end tell'''
+    ok, out, err = osa(script)
+    if not ok:
+        # -1743 = the user hasn't allowed Terminal to control Music yet
+        return {"ok": False, "error": "permission" if "-1743" in err else "script", "detail": err[:200]}
+    if out == "stopped":
+        return {"ok": True, "running": True, "state": "stopped"}
+    parts = out.split("\t")
+    if len(parts) < 8:
+        return {"ok": True, "running": True, "state": "stopped"}
+    st, name, artist, album, dur, pos, vol, pid = parts[:8]
+    num = lambda s: float(s.replace(",", ".") or 0)
+    return {"ok": True, "running": True, "state": st, "name": name, "artist": artist, "album": album,
+            "duration_ms": int(num(dur) * 1000), "position_ms": int(num(pos) * 1000),
+            "volume": int(num(vol)), "id": pid}
+
+
+def music_art(track_id):
+    """Write the current track's artwork to a cache file and return its path."""
+    if not re.fullmatch(r"[0-9A-Fa-f]{6,32}", track_id or ""):
+        return None
+    os.makedirs(MUSIC_ART, exist_ok=True)
+    path = os.path.join(MUSIC_ART, track_id + ".img")
+    if os.path.exists(path):
+        return path
+    script = '''
+tell application "Music"
+  if (count of artworks of current track) is 0 then return "none"
+  set d to raw data of artwork 1 of current track
+end tell
+set f to open for access (POSIX file "%s") with write permission
+set eof f to 0
+write d to f
+close access f
+return "ok"''' % path.replace('"', '')
+    ok, out, _ = osa(script, timeout=6)
+    return path if ok and out == "ok" and os.path.getsize(path) > 0 else None
+
+
+def music_control(action):
+    cmds = {"playpause": "playpause", "next": "next track", "previous": "previous track",
+            "volup": "set sound volume to (sound volume + 8)", "voldown": "set sound volume to (sound volume - 8)",
+            "open": None}
+    if action not in cmds:
+        return False
+    if action == "open":
+        return mac_open(["-a", "Music"])
+    ok, _, _ = osa('tell application "Music" to %s' % cmds[action])
+    return ok
+
+
 # ---------------- calendars ----------------
 def fetch_ics(index):
     cfg = load_config()
@@ -303,7 +414,23 @@ class Handler(SimpleHTTPRequestHandler):
             cfg = load_config()
             cals = [{"name": c.get("name", ""), "color": c.get("color", ""),
                      "hasUrl": bool(c.get("url"))} for c in cfg.get("calendars", [])]
-            return self._json({"calendars": cals})
+            return self._json({"calendars": cals, "layout": get_layout()})
+        if p == "/api/music":
+            return self._json(music_state())
+        if p == "/api/music/art":
+            path = music_art(parse_qs(u.query).get("id", [""])[0])
+            if not path:
+                self.send_error(404)
+                return
+            with open(path, "rb") as f:
+                data = f.read()
+            ctype = "image/png" if data[:4] == b"\x89PNG" else "image/jpeg"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if p == "/api/ics":
             try:
                 idx = int(parse_qs(u.query).get("i", ["-1"])[0])
@@ -367,30 +494,42 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": bool(ok)})
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 400)
+        if p == "/api/music":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(min(n, 1000)) or b"{}")
+                return self._json({"ok": music_control(str(body.get("action", "")))})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 400)
         if p != "/api/config":
             self.send_error(404)
             return
         try:
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(min(n, 100000)) or b"{}")
-            cals = []
-            for c in body.get("calendars", [])[:12]:
-                url = str(c.get("url", "")).strip()
-                if not url:
-                    continue
-                cals.append({"name": str(c.get("name", "Calendar"))[:40],
-                             "color": str(c.get("color", ""))[:9],
-                             "url": url[:2000]})
             cfg = load_config()
-            # keep existing URLs when the page sends "__keep__"
-            old = cfg.get("calendars", [])
-            for i, c in enumerate(cals):
-                if c["url"] == "__keep__" and i < len(old):
-                    c["url"] = old[i]["url"]
-            cfg["calendars"] = [c for c in cals if c["url"] != "__keep__"]
+            if "calendars" in body:
+                cals = []
+                for c in body.get("calendars", [])[:12]:
+                    url = str(c.get("url", "")).strip()
+                    if not url:
+                        continue
+                    cals.append({"name": str(c.get("name", "Calendar"))[:40],
+                                 "color": str(c.get("color", ""))[:9],
+                                 "url": url[:2000]})
+                # keep existing URLs when the page sends "__keep__"
+                old = cfg.get("calendars", [])
+                for i, c in enumerate(cals):
+                    if c["url"] == "__keep__" and i < len(old):
+                        c["url"] = old[i]["url"]
+                cfg["calendars"] = [c for c in cals if c["url"] != "__keep__"]
+                _ics_cache.clear()
+            if isinstance(body.get("layout"), dict):
+                cfg["layout"] = body["layout"]
+                save_config(cfg)
+                cfg["layout"] = get_layout()      # store the cleaned-up version
             save_config(cfg)
-            _ics_cache.clear()
-            return self._json({"ok": True})
+            return self._json({"ok": True, "layout": get_layout()})
         except Exception as e:
             return self._json({"ok": False, "error": str(e)}, 400)
 

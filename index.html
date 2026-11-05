@@ -18,7 +18,8 @@
     -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
   .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
-    grid-template-columns: 1.15fr 1fr 1.25fr 0.95fr; }
+    grid-template-columns: 1.1fr 1.1fr 1.35fr 0.8fr; }
+  .panel.off { display: none; }
   .panel { background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
     display: flex; flex-direction: column; position: relative; overflow: hidden; }
   .label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600;
@@ -119,7 +120,7 @@
   .step.done { color: var(--dim); } .step.done b { color: var(--green); }
   .step.active { color: var(--fg); } .step.active b { color: var(--claude); }
   .upd { font-size: 12px; color: var(--dim); margin-top: auto; padding-top: 8px; }
-  .gear { position: absolute; top: 16px; right: 18px; background: none; border: 0; color: var(--dim); font-size: 20px; padding: 4px; }
+  .gear { position: fixed; bottom: 18px; right: 22px; background: none; border: 0; color: var(--dim); font-size: 20px; padding: 4px; z-index: 5; min-width: 44px; min-height: 44px; }
 
   /* ---------- setup ---------- */
   #setup { position: fixed; inset: 0; background: rgba(5,6,8,.92); display: none; align-items: center; justify-content: center; z-index: 10; }
@@ -132,9 +133,15 @@
   .row input[type=color] { padding: 4px; height: 44px; }
   .fld { margin-bottom: 16px; }
   .fld label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; letter-spacing: .06em; text-transform: uppercase; }
-  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; position: sticky; bottom: -26px; background: var(--panel); padding: 14px 0 26px; }
   .primary { background: var(--green); color: #000; border: 0; border-radius: 12px; padding: 12px 22px; font-size: 16px; font-weight: 700; }
   .x { background: var(--panel2); border: 0; border-radius: 10px; color: var(--muted); }
+  .prow { display: grid; grid-template-columns: 34px 1fr 150px 48px 48px; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 16px; }
+  .prow input[type=checkbox], .chk input { width: 22px; height: 22px; accent-color: var(--green); }
+  .sheet select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 10px 12px; font-size: 15px; width: 100%; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chk { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--fg); margin: 4px 0 6px; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
   hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 </style>
 </head>
@@ -145,7 +152,6 @@
     <div class="clock"><div class="t mono" id="clk">--:--</div><div class="d" id="dte"></div></div>
     <div id="next"></div>
     <div class="agenda" id="agenda"><div class="empty">Loading calendars…</div></div>
-    <button class="gear" id="gear" title="Settings">⚙︎</button>
   </section>
 
   <!-- MESSAGES -->
@@ -178,21 +184,34 @@
 
   <!-- CLAUDE -->
   <section class="panel" id="cl">
-    <div class="label"><span style="color:var(--claude)">✳︎</span> Claude</div>
+    <div class="label" id="ailabel"><span style="color:var(--claude)">✳︎</span> Claude</div>
     <div class="svc" id="svc"><i></i><span id="svctext">Checking service status…</span></div>
     <div class="svc-sub" id="svcsub"></div>
     <div class="task" id="task"></div>
   </section>
 </div>
 
+<button class="gear" id="gear" title="Settings" aria-label="Settings">⚙︎</button>
+
 <!-- SETUP -->
 <div id="setup">
   <div class="sheet">
     <h2>Command Center settings</h2>
     <p>These stay on this Mac. Calendar links are private: anyone with one can read that calendar, so don't share them.</p>
-    <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
-    <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
+    <div class="fld"><label>Panels: tick to show, size, order</label></div>
+    <div id="panelrows"></div>
+    <div class="two" style="margin-top:14px">
+      <div class="fld"><label for="musicSrc">Music</label><select id="musicSrc"><option value="spotify">Spotify</option><option value="apple">Apple Music</option></select></div>
+      <div class="fld"><label for="aiSrc">AI assistant status</label><select id="aiSrc"><option value="claude">Claude</option><option value="openai">ChatGPT / OpenAI</option><option value="github">GitHub Copilot</option><option value="none">None</option></select></div>
+    </div>
+    <label class="chk"><input type="checkbox" id="aiTask"> Show the "what it's working on" card</label>
+    <div class="hint">Claude Code and Codex can fill that card automatically: see "AI task card" in the README.</div>
     <hr>
+    <div id="spotFields">
+      <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
+      <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
+      <hr>
+    </div>
     <div class="fld"><label>Calendars (private iCal / ICS links)</label></div>
     <div id="calrows"></div>
     <button class="ghost" id="addcal">+ Add calendar</button>
@@ -216,6 +235,30 @@ const store = {
 };
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1"];
+
+/* =========================================================
+   LAYOUT (which panels show, how wide, in what order)
+   ========================================================= */
+const PANEL_EL = { calendar: "cal", messages: "msgp", music: "spot", ai: "cl" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", music: "Music", ai: "AI assistant" };
+const SIZE_FR = { s: "0.8fr", m: "1.1fr", l: "1.4fr" };
+let layout = { panels: [{ id: "calendar", on: true, size: "m" }, { id: "messages", on: true, size: "m" }, { id: "music", on: true, size: "l" }, { id: "ai", on: true, size: "s" }], music: "spotify", ai: "claude", aiTask: true };
+function applyLayout() {
+  const cols = [];
+  layout.panels.forEach((p, i) => {
+    const el = $(PANEL_EL[p.id]);
+    el.style.order = i;
+    el.classList.toggle("off", !p.on);
+    if (p.on) cols.push(SIZE_FR[p.size] || "1fr");
+  });
+  document.querySelector(".grid").style.gridTemplateColumns = cols.join(" ") || "1fr";
+  applyAi();
+  applyMusicMode();
+}
+async function loadLayout() {
+  try { const c = await (await fetch("/api/config")).json(); if (c.layout) layout = c.layout; } catch (e) {}
+  applyLayout();
+}
 
 /* =========================================================
    CLOCK
@@ -541,6 +584,7 @@ function spRender() {
   $("dev").classList.toggle("office", !!(s && s.device && (s.device.name || "").trim().toLowerCase() === officeName()));
 }
 function spTick() {
+  if (layout.music !== "spotify") return;
   const s = spState, item = s && s.item;
   if (!item) return;
   let p = s.progress_ms || 0;
@@ -558,6 +602,7 @@ function spNeedsLogin(msg) {
 }
 async function spPoll() {
   clearTimeout(spTimer);
+  if (layout.music !== "spotify") return;
   if (!store.get("spotifyClientId", "")) { spNeedsLogin("Add your Spotify Client ID"); $("splogin").onclick = openSetup; return; }
   try {
     const r = await sp("GET", "?additional_types=episode");
@@ -581,7 +626,7 @@ async function spPoll() {
 }
 
 async function spControl(fn) { try { await fn(); } catch (e) { if (e && (e.needLogin || e.auth)) spNeedsLogin(); else spToast("Spotify didn't respond."); } setTimeout(spPoll, 700); }
-$("play").onclick = () => spControl(async () => {
+$("play").onclick = () => layout.music === "apple" ? amControl("playpause") : spControl(async () => {
   if (!spState || !spState.device) { await moveToOffice(true); return; }
   const playing = spState.is_playing;
   setPlayIcon(!playing);
@@ -589,8 +634,8 @@ $("play").onclick = () => spControl(async () => {
   if (r.status === 404) await moveToOffice(true);
   else if (r.status === 403) spToast("Spotify refused that right now.");
 });
-$("prev").onclick = () => spControl(() => sp("POST", "/previous"));
-$("next2").onclick = () => spControl(() => sp("POST", "/next"));
+$("prev").onclick = () => layout.music === "apple" ? amControl("previous") : spControl(() => sp("POST", "/previous"));
+$("next2").onclick = () => layout.music === "apple" ? amControl("next") : spControl(() => sp("POST", "/next"));
 function vol(delta) {
   spControl(async () => {
     const cur = spState && spState.device && spState.device.volume_percent;
@@ -600,18 +645,111 @@ function vol(delta) {
     await sp("PUT", "/volume?volume_percent=" + v);
   });
 }
-$("vdn").onclick = () => vol(-8);
-$("vup").onclick = () => vol(8);
-$("dev").onclick = () => spControl(() => moveToOffice(spState ? spState.is_playing : true));
-$("autopill").onclick = () => { store.set("autoOffice", store.get("autoOffice", "1") === "1" ? "0" : "1"); spRender(); };
+$("vdn").onclick = () => layout.music === "apple" ? amControl("voldown") : vol(-8);
+$("vup").onclick = () => layout.music === "apple" ? amControl("volup") : vol(8);
+$("dev").onclick = () => layout.music === "apple" ? amControl("open") : spControl(() => moveToOffice(spState ? spState.is_playing : true));
+$("autopill").onclick = () => {
+  if (layout.music === "apple") return;
+  store.set("autoOffice", store.get("autoOffice", "1") === "1" ? "0" : "1"); spRender();
+};
+
+/* ---------- Apple Music (the Mac controls the Music app directly) ---------- */
+let amState = null, amFetched = 0, amTimer = null, amArtId = "";
+function applyMusicMode() {
+  clearTimeout(spTimer); clearTimeout(amTimer);
+  $("sptoast").textContent = "";
+  if (layout.music === "apple") {
+    $("autopill").textContent = "Apple Music";
+    $("autopill").style.cursor = "default";
+    amPoll();
+  } else {
+    $("autopill").style.cursor = "pointer";
+    spPoll();
+  }
+}
+async function amControl(action) {
+  if (action === "playpause" && amState) { amState.state = amState.state === "playing" ? "paused" : "playing"; amRender(); }
+  try { await fetch("/api/music", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }); } catch (e) {}
+  setTimeout(amPoll, 500);
+}
+function amRender() {
+  const s = amState;
+  $("devname").textContent = "Open Music";
+  $("dev").classList.remove("office");
+  if (!s || !s.ok) {
+    $("track").textContent = "Apple Music";
+    $("artist").textContent = s && s.error === "permission"
+      ? "Allow Terminal to control Music: System Settings → Privacy & Security → Automation"
+      : "Can't reach the Music app";
+    return;
+  }
+  if (!s.running || s.state === "stopped" || !s.name) {
+    $("art").style.backgroundImage = ""; $("art").textContent = "♪";
+    $("track").textContent = "Nothing playing";
+    $("artist").textContent = s.running ? "Tap play to start Apple Music" : "Music isn't open. Tap Open Music.";
+    setPlayIcon(false);
+    $("pos").textContent = "0:00"; $("dur").textContent = "0:00"; $("fill").style.width = "0";
+    return;
+  }
+  $("track").textContent = s.name;
+  $("artist").textContent = s.artist + (s.album ? " · " + s.album : "");
+  setPlayIcon(s.state === "playing");
+  if (s.id !== amArtId) {
+    amArtId = s.id;
+    const img = new Image();
+    img.onload = () => { $("art").style.backgroundImage = `url("${img.src}")`; $("art").textContent = ""; };
+    img.onerror = () => { $("art").style.backgroundImage = ""; $("art").textContent = "♪"; };
+    img.src = "/api/music/art?id=" + encodeURIComponent(s.id);
+  }
+  amTick();
+}
+function amTick() {
+  const s = amState;
+  if (layout.music !== "apple" || !s || !s.name) return;
+  let p = s.position_ms + (s.state === "playing" ? Date.now() - amFetched : 0);
+  p = Math.min(p, s.duration_ms);
+  $("pos").textContent = fmtMs(p); $("dur").textContent = fmtMs(s.duration_ms);
+  $("fill").style.width = s.duration_ms ? (100 * p / s.duration_ms).toFixed(2) + "%" : "0";
+}
+setInterval(amTick, 500);
+async function amPoll() {
+  clearTimeout(amTimer);
+  if (layout.music !== "apple") return;
+  try { amState = await (await fetch("/api/music")).json(); amFetched = Date.now(); } catch (e) { amState = { ok: false }; }
+  amRender();
+  amTimer = setTimeout(amPoll, amState && amState.state === "playing" ? 3000 : 8000);
+}
 $("autopill").style.cursor = "pointer";
 
 /* =========================================================
    CLAUDE
    ========================================================= */
+const AI = {
+  claude: { name: "Claude", mark: "✳︎", color: "var(--claude)", url: "https://status.claude.com/api/v2/summary.json" },
+  openai: { name: "ChatGPT", mark: "◎", color: "#10a37f", url: "https://status.openai.com/api/v2/summary.json" },
+  github: { name: "GitHub Copilot", mark: "◆", color: "#8b949e", url: "https://www.githubstatus.com/api/v2/summary.json", only: /copilot/i },
+  none:   { name: "AI assistant", mark: "✳︎", color: "var(--muted)", url: "" }
+};
+function aiCfg() { return AI[layout.ai] || AI.claude; }
+function applyAi() {
+  const a = aiCfg();
+  $("ailabel").innerHTML = `<span style="color:${a.color}">${a.mark}</span> ${esc(a.name)}`;
+  $("svc").style.display = a.url ? "" : "none";
+  $("svcsub").style.display = a.url ? "" : "none";
+  $("task").style.display = layout.aiTask ? "" : "none";
+  loadService();
+}
 async function loadService() {
+  const a = aiCfg();
+  if (!a.url) return;
   try {
-    const d = await (await fetch("https://status.claude.com/api/v2/summary.json", { cache: "no-store" })).json();
+    const d = await (await fetch(a.url, { cache: "no-store" })).json();
+    if (a.only) {   // GitHub: judge only the Copilot component, not all of GitHub
+      const c = (d.components || []).find(x => a.only.test(x.name));
+      if (c) d.status = { indicator: c.status === "operational" ? "none" : (c.status === "major_outage" ? "major" : "minor"), description: c.status === "operational" ? "Copilot operational" : "Copilot: " + c.status.replace(/_/g, " ") };
+      d.components = c ? [c] : [];
+      d.incidents = (d.incidents || []).filter(i => a.only.test(i.name));
+    }
     const ind = d.status.indicator;
     $("svc").className = "svc " + (ind === "none" ? "ok" : ind);
     $("svctext").textContent = d.status.description;
@@ -636,9 +774,9 @@ async function loadTask() {
   const steps = (s.steps || []).slice(0, 7).map(st => `<div class="step ${esc(st.state || "")}"><b>${st.state === "done" ? "✓" : st.state === "active" ? "›" : "·"}</b><span>${esc(st.label)}</span></div>`).join("");
   $("task").innerHTML = `<div class="state ${esc(state)}">${state === "working" ? '<span class="pulse"></span>' : ""}${label}</div>
     <div class="ttl">${esc(s.task)}</div>${s.detail ? `<div class="det">${esc(s.detail)}</div>` : ""}
-    <div class="steps">${steps}</div>${upd ? `<div class="upd">Updated ${esc(fmtTime(upd))}</div>` : ""}`;
+    <div class="steps">${steps}</div>${upd ? `<div class="upd">Updated ${esc(fmtTime(upd))}${s.source ? " · " + esc(s.source) : ""}</div>` : ""}`;
 }
-loadService(); setInterval(loadService, 120000);
+setInterval(loadService, 120000);
 loadTask(); setInterval(loadTask, 8000);
 
 /* =========================================================
@@ -654,7 +792,32 @@ function calRow(c, i) {
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
+let draftPanels = [];
+function renderPanelRows() {
+  const box = $("panelrows"); box.innerHTML = "";
+  draftPanels.forEach((p, i) => {
+    const r = document.createElement("div"); r.className = "prow";
+    r.innerHTML = `<input type="checkbox" ${p.on ? "checked" : ""} aria-label="Show ${esc(PANEL_NAME[p.id])}">
+      <span>${esc(PANEL_NAME[p.id])}</span>
+      <select aria-label="Width"><option value="s">Narrow</option><option value="m">Medium</option><option value="l">Wide</option></select>
+      <button class="x" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
+      <button class="x" ${i === draftPanels.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>`;
+    const [cb, , sel, up, dn] = r.children;
+    sel.value = p.size;
+    cb.onchange = () => { p.on = cb.checked; };
+    sel.onchange = () => { p.size = sel.value; };
+    up.onclick = () => { draftPanels.splice(i - 1, 0, draftPanels.splice(i, 1)[0]); renderPanelRows(); };
+    dn.onclick = () => { draftPanels.splice(i + 1, 0, draftPanels.splice(i, 1)[0]); renderPanelRows(); };
+    box.appendChild(r);
+  });
+}
+$("musicSrc").onchange = () => { $("spotFields").style.display = $("musicSrc").value === "spotify" ? "" : "none"; };
 async function openSetup() {
+  draftPanels = layout.panels.map(p => Object.assign({}, p));
+  renderPanelRows();
+  $("musicSrc").value = layout.music; $("musicSrc").onchange();
+  $("aiSrc").value = layout.ai;
+  $("aiTask").checked = !!layout.aiTask;
   $("cid").value = store.get("spotifyClientId", "");
   $("officeName").value = store.get("officeName", "office speakers");
   let cfg = { calendars: [] };
@@ -676,14 +839,18 @@ $("save").onclick = async () => {
     color: r.querySelector(".cc").value,
     url: r.querySelector(".cu").value.trim() || (r.dataset.has ? "__keep__" : "")
   })).filter(c => c.url);
-  try { await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: cals }) }); } catch (e) {}
+  const newLayout = { panels: draftPanels, music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
+  try {
+    const r = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: cals, layout: newLayout }) })).json();
+    layout = r.layout || newLayout;
+  } catch (e) { layout = newLayout; }
   $("setup").classList.remove("show");
   if (oldCid !== store.get("spotifyClientId", "")) ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
-  loadCalendars(); spPoll();
+  applyLayout(); loadCalendars();
 };
 
 /* start */
-handleCallback().then(spPoll);
+handleCallback().then(loadLayout);
 })();
 </script>
 </body>
