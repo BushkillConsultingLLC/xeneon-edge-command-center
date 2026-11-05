@@ -29,7 +29,7 @@ Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, 
 
 1. Download this repository (**Code → Download ZIP**) and unzip it somewhere permanent, for example `~/Applications/Command Center`.
 2. Double-click **Start Command Center.command**. If macOS blocks it, right-click it and choose **Open**.
-3. A Chrome window opens. Drag it onto the Edge and press **Control+Command+F** for full screen.
+3. The dashboard finds the Edge by itself and opens full screen on it, with no title bar. To close it, click it and press **Command+Q**, or run **Stop Command Center**. (No Edge connected? It opens as a normal window you can drag anywhere.)
 4. Tap the **⚙︎** in the bottom-right corner to choose your panels and connect your accounts (below).
 
 To start it automatically, add **Start Command Center.command** to *System Settings → General → Login Items*.
