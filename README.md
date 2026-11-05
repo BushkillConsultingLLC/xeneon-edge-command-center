@@ -8,8 +8,8 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 
 | Panel | What it shows |
 |---|---|
-| **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Handles recurring events, all-day events and time zones. |
-| **Messages** | Your most recent incoming iMessages and texts, with names from Contacts. Unread ones are marked. Deleted messages drop off. |
+| **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
+| **Messages** | Your most recent incoming iMessages and texts, with names from Contacts. Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
 | **Now Playing** | Spotify album art, track, progress and big touch controls. Can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. |
 | **Claude** | Live [Claude service status](https://status.claude.com), plus a task card that shows what an AI assistant (or anything else) is working on, fed by a simple JSON file. |
 
@@ -84,7 +84,7 @@ The Claude task card reads `claude-status.json` in the app folder and checks it 
 
 ## How it works
 
-- `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888` and rejects requests with any other `Host` header.
+- `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888`, rejects requests with any other `Host` header, and refuses write requests from other websites open in the browser (Origin, Fetch-Metadata and JSON content-type checks). Taps that open apps go through the server's `/api/open`, which only opens Messages conversations, calendar days for your configured feeds, and links on known video-meeting hosts.
 - `index.html`: the whole UI in one file, with no build step. Calendars are parsed with [ical.js](https://github.com/kewisch/ical.js) (bundled as `ical.min.js`, MPL-2.0).
 - **Start / Stop Command Center.command**: start the server and open a dedicated Chrome app window (separate profile at `~/Library/Application Support/CommandCenterChrome`), or stop both.
 

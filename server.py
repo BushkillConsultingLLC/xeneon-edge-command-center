@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import time
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -172,6 +173,71 @@ def recent_messages(limit=12):
     return {"ok": True, "messages": out}
 
 
+# ---------------- opening things on the Mac ----------------
+MEETING_HOSTS = ("zoom.us", "teams.microsoft.com", "teams.live.com", "meet.google.com",
+                 "webex.com", "gotomeeting.com", "meet.goto.com", "whereby.com")
+
+
+def mac_open(args):
+    """Run macOS `open` without a shell. Returns True if it launched."""
+    try:
+        subprocess.Popen(["/usr/bin/open"] + args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
+
+
+def open_message(rowid):
+    """Open Messages to the conversation that message belongs to."""
+    try:
+        con = sqlite3.connect("file:%s?mode=ro" % CHAT_DB, uri=True, timeout=2)
+        row = con.execute("""
+            SELECT c.chat_identifier, c.style, h.id
+            FROM message m
+            JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+            JOIN chat c ON c.ROWID = cmj.chat_id
+            LEFT JOIN handle h ON h.ROWID = m.handle_id
+            WHERE m.ROWID = ?""", (int(rowid),)).fetchone()
+        con.close()
+    except Exception:
+        row = None
+    if not row:
+        return mac_open(["-a", "Messages"])
+    ident, style, handle = row
+    target = handle or ident or ""
+    # style 43 = group chat: there's no URL for a group, so just bring Messages up
+    if style == 43 or not re.fullmatch(r"[+\d][\d\s().-]{5,}|[^@\s]+@[^@\s]+\.[^@\s]+", target):
+        return mac_open(["-a", "Messages"])
+    scheme = "imessage:" if "@" in target else "sms:"
+    return mac_open([scheme + re.sub(r"[\s().-]", "", target)])
+
+
+def open_calendar_day(index, ymd):
+    """Open the calendar that feed belongs to, at that day."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", ymd or "")
+    cals = load_config().get("calendars", [])
+    if not m or index < 0 or index >= len(cals):
+        return mac_open(["-a", "Calendar"])
+    y, mo, d = m.group(1), int(m.group(2)), int(m.group(3))
+    host = (urlparse(cals[index]["url"].replace("webcal://", "https://")).hostname or "").lower()
+    if host.endswith("calendar.google.com") or host.endswith("google.com"):
+        return mac_open(["https://calendar.google.com/calendar/r/day/%s/%d/%d" % (y, mo, d)])
+    if host.endswith("outlook.office365.com") or host.endswith("outlook.office.com"):
+        return mac_open(["https://outlook.office.com/calendar/view/day/%s/%d/%d" % (y, mo, d)])
+    if host.endswith("outlook.live.com"):
+        return mac_open(["https://outlook.live.com/calendar/0/view/day/%s/%d/%d" % (y, mo, d)])
+    return mac_open(["-a", "Calendar"])          # iCloud and others: Apple Calendar
+
+
+def open_meeting(url):
+    """Open a video-meeting link, but only for known meeting services."""
+    u = urlparse(url or "")
+    host = (u.hostname or "").lower()
+    if u.scheme != "https" or not any(host == h or host.endswith("." + h) for h in MEETING_HOSTS):
+        return False
+    return mac_open([url])
+
+
 # ---------------- calendars ----------------
 def fetch_ics(index):
     cfg = load_config()
@@ -266,10 +332,42 @@ class Handler(SimpleHTTPRequestHandler):
             return
         return super().do_GET()
 
+    def _same_origin(self):
+        """Refuse writes from other websites open in the browser (CSRF)."""
+        origin = self.headers.get("Origin")
+        if origin and origin.rstrip("/") not in ("http://127.0.0.1:%d" % PORT, "http://localhost:%d" % PORT):
+            return False
+        if self.headers.get("Sec-Fetch-Site", "same-origin") not in ("same-origin", "none"):
+            return False
+        # A JSON content type forces a CORS preflight for cross-site requests
+        return self.headers.get("Content-Type", "").split(";")[0].strip() == "application/json"
+
     def do_POST(self):
         if not self._host_ok():
             return
-        if urlparse(self.path).path != "/api/config":
+        if not self._same_origin():
+            self.send_error(403)
+            return
+        p = urlparse(self.path).path
+        if p == "/api/open":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(min(n, 10000)) or b"{}")
+                kind = body.get("kind")
+                if kind == "message":
+                    ok = open_message(body.get("id", 0))
+                elif kind == "calendar":
+                    ok = open_calendar_day(int(body.get("cal", -1)), str(body.get("date", "")))
+                elif kind == "meeting":
+                    ok = open_meeting(str(body.get("url", "")))
+                elif kind == "messages-app":
+                    ok = mac_open(["-a", "Messages"])
+                else:
+                    ok = False
+                return self._json({"ok": bool(ok)})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 400)
+        if p != "/api/config":
             self.send_error(404)
             return
         try:

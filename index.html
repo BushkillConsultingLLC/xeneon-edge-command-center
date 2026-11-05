@@ -36,7 +36,18 @@
   .clock { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; }
   .clock .t { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
   .clock .d { font-size: 19px; color: var(--muted); }
-  .next { background: var(--panel2); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; border-left: 5px solid var(--blue); }
+  .next { background: var(--panel2); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; border-left: 5px solid var(--blue); cursor: pointer; position: relative; }
+  .join { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: var(--green); color: #000; border: 0; border-radius: 12px;
+    font-size: 20px; font-weight: 700; padding: 14px 26px; min-height: 52px; }
+  .join:active { transform: translateY(-50%) scale(.95); }
+  .hasjoin { position: absolute; right: 18px; top: 18px; font-size: 13px; color: var(--muted); }
+  .next .title { padding-right: 120px; }
+  button.ev, .allday button, button.msg { font: inherit; color: inherit; background: none; border: 0; text-align: left; width: 100%; cursor: pointer; }
+  .allday button { width: auto; font-size: 14px; padding: 5px 10px; border-radius: 8px; background: var(--panel2); }
+  button.ev { border-radius: 10px; padding-left: 0; padding-right: 6px; }
+  button.msg { background: var(--panel2); display: block; }
+  .tapped { outline: 2px solid var(--blue); outline-offset: 2px; }
+  #msgp .label { cursor: pointer; }
   .next .k { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
   .next .k b { color: var(--fg); }
   .next .title { font-size: 28px; font-weight: 700; margin: 6px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -50,7 +61,6 @@
   .ev.past { opacity: .38; }
   .ev.cur .nm { font-weight: 700; }
   .allday { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
-  .allday span { font-size: 14px; padding: 5px 10px; border-radius: 8px; background: var(--panel2); }
   .subhead { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; font-weight: 600; }
 
   /* ---------- messages ---------- */
@@ -242,17 +252,22 @@ function parseIcs(text, cal) {
   });
   exceptions.forEach(ex => { const m = masters[ex.uid]; if (m && m.isRecurring()) { try { m.relateException(ex); } catch (e) {} } });
 
-  const push = (summary, s, e, loc, status) => {
+  const push = (summary, s, e, loc, status, comp) => {
     if (status && String(status).toUpperCase() === "CANCELLED") return;
     const allDay = s.isDate;
     const start = s.toJSDate(), end = e ? e.toJSDate() : new Date(start.getTime() + (allDay ? 86400000 : 3600000));
     if (end <= winStart || start >= winEnd) return;
-    out.push({ title: summary || "(No title)", start, end, allDay, loc: loc || "", color: cal.color, cal: cal.name });
+    let join = "";
+    try {
+      const hay = [loc, comp && comp.getFirstPropertyValue("url"), comp && comp.getFirstPropertyValue("description")].filter(Boolean).join(" ");
+      join = findMeetingUrl(hay);
+    } catch (e2) {}
+    out.push({ title: summary || "(No title)", start, end, allDay, loc: loc || "", color: cal.color, cal: cal.name, calIdx: cal.idx, join });
   };
 
   Object.values(masters).forEach(ev => {
     if (!ev.isRecurring()) {
-      push(ev.summary, ev.startDate, ev.endDate, ev.location, ev.component.getFirstPropertyValue("status"));
+      push(ev.summary, ev.startDate, ev.endDate, ev.location, ev.component.getFirstPropertyValue("status"), ev.component);
       return;
     }
     const it = ev.iterator();
@@ -263,18 +278,33 @@ function parseIcs(text, cal) {
       let det;
       try { det = ev.getOccurrenceDetails(next); } catch (e) { continue; }
       const it2 = det.item;
-      push(it2.summary, det.startDate, det.endDate, it2.location, it2.component.getFirstPropertyValue("status"));
+      push(it2.summary, det.startDate, det.endDate, it2.location, it2.component.getFirstPropertyValue("status"), it2.component);
     }
   });
   // exceptions whose master is missing
-  exceptions.forEach(ex => { if (!masters[ex.uid]) push(ex.summary, ex.startDate, ex.endDate, ex.location, ex.component.getFirstPropertyValue("status")); });
+  exceptions.forEach(ex => { if (!masters[ex.uid]) push(ex.summary, ex.startDate, ex.endDate, ex.location, ex.component.getFirstPropertyValue("status"), ex.component); });
   return out;
 }
+
+const MEETING_RE = /https:\/\/[^\s<>"')\]]*(?:zoom\.us|teams\.microsoft\.com|teams\.live\.com|meet\.google\.com|webex\.com|gotomeeting\.com|meet\.goto\.com|whereby\.com)[^\s<>"')\]]*/i;
+function findMeetingUrl(text) {
+  const m = String(text || "").match(MEETING_RE);
+  return m ? m[0].replace(/[.,;]+$/, "") : "";
+}
+
+/* Ask the Mac to open something (Messages, a calendar day, a meeting) on the main screen */
+async function macOpen(body, el) {
+  if (el) { el.classList.add("tapped"); setTimeout(() => el.classList.remove("tapped"), 400); }
+  try {
+    await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  } catch (e) {}
+}
+function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
 async function loadCalendars() {
   try {
     const cfg = await (await fetch("/api/config")).json();
-    calendars = cfg.calendars.map((c, i) => ({ name: c.name, color: c.color || PALETTE[i % PALETTE.length] }));
+    calendars = cfg.calendars.map((c, i) => ({ name: c.name, color: c.color || PALETTE[i % PALETTE.length], idx: i }));
   } catch (e) { calError = "Can't reach the local server."; renderCal(); return; }
   if (!calendars.length) { calError = ""; events = []; renderCal(); return; }
   const all = [], failed = [];
@@ -313,14 +343,17 @@ function renderCal() {
   // Next up / Now
   const current = timed.find(e => e.start <= now && e.end > now);
   const upcoming = timed.find(e => e.start > now) || tomorrow.find(e => !e.allDay);
+  const evIdx = e => events.indexOf(e);
+  // Join shows from 15 minutes before a meeting until it ends
+  const joinBtn = e => e.join && e.start - now < 15 * 60000 ? `<button class="join" data-join="${evIdx(e)}">Join</button>` : (e.join ? `<span class="hasjoin">Video link</span>` : "");
   let nh = "";
   if (current) {
-    nh = `<div class="next now"><div class="k">Now · <b>ends in ${rel(current.end - now)}</b></div>
-      <div class="title">${esc(current.title)}</div><div class="meta">${esc(evRange(current))}${current.loc ? " · " + esc(current.loc) : ""}</div></div>`;
+    nh = `<div class="next now" role="link" tabindex="0" data-ev="${evIdx(current)}"><div class="k">Now · <b>ends in ${rel(current.end - now)}</b></div>
+      <div class="title">${esc(current.title)}</div><div class="meta">${esc(evRange(current))}${current.loc && !current.join ? " · " + esc(current.loc) : ""}</div>${joinBtn(current)}</div>`;
   } else if (upcoming) {
     const isTom = upcoming.start >= tom0;
-    nh = `<div class="next" style="border-left-color:${esc(upcoming.color)}"><div class="k">Next up · <b>${isTom ? "tomorrow " + fmtTime(upcoming.start) : "in " + rel(upcoming.start - now)}</b></div>
-      <div class="title">${esc(upcoming.title)}</div><div class="meta">${esc(evRange(upcoming))}${upcoming.loc ? " · " + esc(upcoming.loc) : ""} · ${esc(upcoming.cal)}</div></div>`;
+    nh = `<div class="next" role="link" tabindex="0" data-ev="${evIdx(upcoming)}" style="border-left-color:${esc(upcoming.color)}"><div class="k">Next up · <b>${isTom ? "tomorrow " + fmtTime(upcoming.start) : "in " + rel(upcoming.start - now)}</b></div>
+      <div class="title">${esc(upcoming.title)}</div><div class="meta">${esc(evRange(upcoming))}${upcoming.loc && !upcoming.join ? " · " + esc(upcoming.loc) : ""} · ${esc(upcoming.cal)}</div>${joinBtn(upcoming)}</div>`;
   }
   $("next").innerHTML = nh;
 
@@ -329,25 +362,35 @@ function renderCal() {
     return;
   }
   let h = "";
-  if (allday.length) h += `<div class="allday">${allday.map(e => `<span style="box-shadow:inset 3px 0 0 ${esc(e.color)}">${esc(e.title)}</span>`).join("")}</div>`;
+  if (allday.length) h += `<div class="allday">${allday.map(e => `<button data-ev="${evIdx(e)}" style="box-shadow:inset 3px 0 0 ${esc(e.color)}">${esc(e.title)}</button>`).join("")}</div>`;
   const remaining = timed.filter(e => e.end > now);
   const past = timed.filter(e => e.end <= now).slice(-1);
   const rows = past.concat(remaining).slice(0, 8);
   rows.forEach(e => {
     const cls = e.end <= now ? "past" : (e.start <= now ? "cur" : "");
-    h += `<div class="ev ${cls}"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></div>`;
+    h += `<button class="ev ${cls}" data-ev="${evIdx(e)}"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></button>`;
   });
   if (!remaining.length) {
     h += `<div class="empty" style="margin:6px 0;font-size:17px">Nothing else today.</div>`;
     const tl = tomorrow.filter(e => !e.allDay).slice(0, 4);
     if (tl.length) {
       h += `<div class="subhead">Tomorrow</div>`;
-      tl.forEach(e => { h += `<div class="ev"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></div>`; });
+      tl.forEach(e => { h += `<button class="ev" data-ev="${evIdx(e)}"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></button>`; });
     }
   }
   if (calError) h += `<div class="err" style="margin-top:auto">${esc(calError)}</div>`;
   $("agenda").innerHTML = h;
 }
+
+// Tap an event: open its calendar at that day. Tap Join: open the meeting.
+$("cal").addEventListener("click", ev => {
+  const j = ev.target.closest("[data-join]");
+  if (j) { ev.stopPropagation(); const e = events[+j.dataset.join]; if (e && e.join) macOpen({ kind: "meeting", url: e.join }, j); return; }
+  const b = ev.target.closest("[data-ev]");
+  if (!b) return;
+  const e = events[+b.dataset.ev];
+  if (e) macOpen({ kind: "calendar", cal: e.calIdx, date: ymd(e.start) }, b);
+});
 loadCalendars(); setInterval(loadCalendars, 5 * 60000); setInterval(renderCal, 30000);
 
 /* =========================================================
@@ -375,12 +418,18 @@ async function loadMessages() {
   const unread = d.messages.filter(m => m.unread).length;
   $("msgcount").textContent = unread ? unread + " unread" : "";
   $("msgs").innerHTML = list.length ? list.map(m => `
-    <div class="msg ${m.unread ? "unread" : ""}">
+    <button class="msg ${m.unread ? "unread" : ""}" data-msg="${esc(m.id)}">
       <div class="top"><span class="who">${esc(m.from)}</span>${m.group ? `<span class="grp">in ${esc(m.group)}</span>` : ""}<span class="when">${esc(ago(m.time))}</span></div>
       <div class="body">${esc(m.text)}</div>
-    </div>`).join("") : `<div class="empty">No messages.</div>`;
+    </button>`).join("") : `<div class="empty">No messages.</div>`;
 }
 loadMessages(); setInterval(loadMessages, 15000);
+// Tap a message: open that conversation in Messages on the main screen
+$("msgs").addEventListener("click", ev => {
+  const b = ev.target.closest("[data-msg]");
+  if (b) macOpen({ kind: "message", id: +b.dataset.msg }, b);
+});
+$("msgp").querySelector(".label").addEventListener("click", () => macOpen({ kind: "messages-app" }));
 
 /* =========================================================
    SPOTIFY (PKCE: no secret needed, tokens stay in this browser)
