@@ -1,0 +1,110 @@
+# Xeneon Edge Command Center
+
+A full-width, touch-friendly dashboard for the **Corsair Xeneon Edge** (the 14.5" 2560×720 touchscreen) on a **Mac**.
+
+Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the panel is just a second monitor. This project turns it into a glanceable command center:
+
+![Command Center on the Xeneon Edge](docs/screenshot.png)
+
+| Panel | What it shows |
+|---|---|
+| **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Handles recurring events, all-day events and time zones. |
+| **Messages** | Your most recent incoming iMessages and texts, with names from Contacts. Unread ones are marked. Deleted messages drop off. |
+| **Now Playing** | Spotify album art, track, progress and big touch controls. Can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. |
+| **Claude** | Live [Claude service status](https://status.claude.com), plus a task card that shows what an AI assistant (or anything else) is working on, fed by a simple JSON file. |
+
+Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, and nothing is sent anywhere except the services you connect (Spotify, your calendar feeds, Claude's public status page).
+
+## Requirements
+
+- A Mac with macOS 13 or later
+- A Corsair Xeneon Edge connected over USB-C (or any display; it works on any 2560×720 window)
+- Google Chrome (the dashboard opens in its own app window)
+- Python 3 from Apple's command-line tools. If it's missing, macOS offers to install it the first time you start the dashboard.
+- Spotify Premium for playback control
+
+## Install
+
+1. Download this repository (**Code → Download ZIP**) and unzip it somewhere permanent, for example `~/Applications/Command Center`.
+2. Double-click **Start Command Center.command**. If macOS blocks it, right-click it and choose **Open**.
+3. A Chrome window opens. Drag it onto the Edge and press **Control+Command+F** for full screen.
+4. Tap the **⚙︎** in the top-right of the calendar panel to connect your accounts (below).
+
+To start it automatically, add **Start Command Center.command** to *System Settings → General → Login Items*.
+
+### Touch
+
+macOS ignores the Edge's touch panel unless a driver is installed. Double-click **Install Touch Driver.command**. It downloads and builds [MacXeneonEdgeTouchDriver](https://github.com/ajvwhite/MacXeneonEdgeTouchDriver) (MIT) at a pinned, reviewed commit, with no admin password needed, then walks you through the two permissions it needs (*Accessibility* and *Input Monitoring*). It handles one finger at a time: taps and drags work, pinch doesn't.
+
+### Calendars
+
+Each calendar needs its private ICS link. Paste it into the settings sheet, and add as many rows as you like.
+
+- **Google Calendar:** on a computer, open Google Calendar → hover the calendar → **⋮ → Settings and sharing** → **Integrate calendar** → copy **Secret address in iCal format**. Google only shows this to a calendar's owner.
+- **Outlook / Microsoft 365:** Outlook on the web → **Settings → Calendar → Shared calendars → Publish a calendar** → choose *Can view all details* → copy the **ICS** link. Some work accounts disable publishing.
+- **iCloud:** Calendar app → right-click the calendar → **Share Calendar** → **Public Calendar** → copy the link.
+
+Treat these links like passwords. They're stored in `config.json` next to the server, which is readable only by your user and excluded from git.
+
+### Spotify
+
+1. At [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), create an app.
+2. Add the Redirect URI **`http://127.0.0.1:8888/callback`** exactly, and tick **Web API**.
+3. Copy the app's **Client ID** into the dashboard settings and tap **Sign in with Spotify**.
+
+The dashboard uses Spotify's PKCE sign-in, so no client secret is needed. Tokens stay in that Chrome window's local storage.
+
+**Preferred speaker:** enter its name exactly as Spotify shows it (for example `office speakers`). Pressing play when nothing is active starts music there. If music starts in the Spotify app on this Mac, it's moved to the speaker automatically, but playback on your phone or elsewhere is never touched. Tap the **Auto** pill to turn this off. Spotify only lists Cast speakers it has seen recently, so if yours isn't found, pick it once in the Spotify app.
+
+### Messages
+
+Messages history lives in a protected database. Give access once: *System Settings → Privacy & Security → Full Disk Access →* turn on **Terminal**, then run **Stop** and **Start** again. (The server starts from Terminal, so it inherits Terminal's permission.)
+
+Heads up: the panel shows message text, including verification codes, to anyone who can see your desk.
+
+## Claude status file
+
+The Claude task card reads `claude-status.json` in the app folder and checks it every 8 seconds. Anything can write it: an AI assistant with access to the folder, a script, a cron job. See `claude-status.example.json`:
+
+```json
+{
+  "state": "working",
+  "task": "Drafting the quarterly report",
+  "detail": "Pulling numbers from the sales sheet",
+  "steps": [
+    { "label": "Collect the data", "state": "done" },
+    { "label": "Write the summary", "state": "active" },
+    { "label": "Build the charts", "state": "todo" }
+  ],
+  "updated": "2026-11-05T16:40:00Z"
+}
+```
+
+`state` is one of `working`, `waiting` (needs you), `done` or `idle`. Cards older than two hours fall back to *Idle* automatically.
+
+## How it works
+
+- `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888` and rejects requests with any other `Host` header.
+- `index.html`: the whole UI in one file, with no build step. Calendars are parsed with [ical.js](https://github.com/kewisch/ical.js) (bundled as `ical.min.js`, MPL-2.0).
+- **Start / Stop Command Center.command**: start the server and open a dedicated Chrome app window (separate profile at `~/Library/Application Support/CommandCenterChrome`), or stop both.
+
+Logs: `~/Library/Logs/CommandCenter.log`.
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "Can't reach the local server" | Run **Start Command Center** again. Check the log above. |
+| A calendar says "Couldn't load" | The link is wrong or not public. Google's *Public URL* only works for public calendars, so use the *Secret address*. |
+| Messages asks for permission | Turn on Full Disk Access for Terminal, then Stop and Start. |
+| Spotify "speaker isn't visible" | Choose the speaker once in the Spotify app, then tap the speaker chip on the dashboard. |
+| Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
+
+## Credits and license
+
+MIT © Bushkill Consulting LLC. See [LICENSE](LICENSE).
+
+- [ical.js](https://github.com/kewisch/ical.js) by Philipp Kewisch and contributors, MPL-2.0
+- [MacXeneonEdgeTouchDriver](https://github.com/ajvwhite/MacXeneonEdgeTouchDriver) by ajvwhite, MIT (downloaded at install time, not bundled)
+
+"Corsair" and "Xeneon" are trademarks of Corsair Gaming, Inc. Spotify is a trademark of Spotify AB. Claude is a trademark of Anthropic. This project is not affiliated with or endorsed by any of them. The names are used only to describe compatibility.

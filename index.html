@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command Center</title>
+<style>
+  :root {
+    --bg: #0b0d10; --panel: #14171c; --panel2: #1b1f26; --line: #262b33;
+    --fg: #eef0f3; --muted: #9aa3ae; --dim: #5d6672;
+    --green: #1ed760; --amber: #f5b942; --red: #f2555a; --blue: #6aa8ff; --violet: #c3a6ff;
+    --claude: #d97757;
+    --r: 18px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
+    grid-template-columns: 1.15fr 1fr 1.25fr 0.95fr; }
+  .panel { background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
+    display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+    display: flex; align-items: center; gap: 10px; }
+  .label .sp { flex: 1; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 18px; margin: auto 0; line-height: 1.4; }
+  .err { color: var(--amber); font-size: 15px; line-height: 1.4; }
+  .ghost { background: var(--panel2); border: 0; border-radius: 12px; padding: 12px 18px; font-size: 16px; }
+  .ghost:active { background: var(--line); }
+  .pill { font-size: 13px; padding: 5px 10px; border-radius: 99px; background: var(--panel2); color: var(--muted);
+    letter-spacing: 0; text-transform: none; font-weight: 500; white-space: nowrap; }
+
+  /* ---------- calendar ---------- */
+  .clock { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; }
+  .clock .t { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .clock .d { font-size: 19px; color: var(--muted); }
+  .next { background: var(--panel2); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; border-left: 5px solid var(--blue); }
+  .next .k { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .next .k b { color: var(--fg); }
+  .next .title { font-size: 28px; font-weight: 700; margin: 6px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .next .meta { font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .next.now { border-left-color: var(--green); }
+  .agenda { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 2px; }
+  .ev { display: grid; grid-template-columns: 92px 10px 1fr; gap: 12px; align-items: center; padding: 7px 0; font-size: 18px; }
+  .ev .tm { color: var(--muted); font-size: 15px; text-align: right; }
+  .ev .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .ev .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ev.past { opacity: .38; }
+  .ev.cur .nm { font-weight: 700; }
+  .allday { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .allday span { font-size: 14px; padding: 5px 10px; border-radius: 8px; background: var(--panel2); }
+  .subhead { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; font-weight: 600; }
+
+  /* ---------- messages ---------- */
+  .msgs { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .msg { background: var(--panel2); border-radius: 14px; padding: 12px 14px; }
+  .msg .top { display: flex; gap: 8px; align-items: baseline; }
+  .msg .who { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg .grp { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .msg .when { margin-left: auto; color: var(--dim); font-size: 13px; white-space: nowrap; }
+  .msg .body { font-size: 16px; color: #cfd4da; margin-top: 4px; line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .msg.unread { box-shadow: inset 4px 0 0 var(--blue); }
+  .msg.unread .who::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--blue);
+    border-radius: 50%; margin-left: 8px; vertical-align: middle; }
+
+  /* ---------- spotify ---------- */
+  .sp-body { flex: 1; display: flex; align-items: center; gap: 24px; min-height: 0; margin-top: 14px; }
+  .art { width: min(50%, calc(100vh - 110px)); aspect-ratio: 1 / 1; border-radius: 14px; background: var(--panel2) center/cover no-repeat;
+    flex: none; display: flex; align-items: center; justify-content: center; font-size: 80px; color: var(--line); }
+  .sp-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+  .track { font-size: 30px; font-weight: 700; line-height: 1.12; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .artist { font-size: 19px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prog { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .bar { flex: 1; height: 5px; background: var(--line); border-radius: 9px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--green); }
+  .ctrls { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .cb { width: 62px; height: 62px; border-radius: 50%; border: 0; background: var(--panel2); display: flex; align-items: center; justify-content: center; }
+  .cb svg { width: 26px; height: 26px; fill: currentColor; }
+  .cb.play { width: 76px; height: 76px; background: var(--green); color: #000; }
+  .cb.play svg { width: 32px; height: 32px; }
+  .cb.sm { width: 50px; height: 50px; font-size: 22px; font-weight: 600; }
+  .cb:active { transform: scale(.94); }
+  .dev { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; background: var(--panel2); border: 0; border-radius: 99px;
+    padding: 9px 14px; font-size: 15px; color: var(--muted); max-width: 100%; }
+  .dev.office { color: var(--green); }
+  .dev svg { width: 16px; height: 16px; fill: currentColor; flex: none; }
+  .dev span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toast { position: absolute; left: 24px; right: 24px; bottom: 16px; font-size: 14px; color: var(--amber); }
+
+  /* ---------- claude ---------- */
+  .svc { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 16px; }
+  .svc i { width: 12px; height: 12px; border-radius: 50%; background: var(--dim); flex: none; }
+  .svc.ok i { background: var(--green); } .svc.minor i { background: var(--amber); } .svc.major i, .svc.critical i { background: var(--red); }
+  .svc-sub { font-size: 14px; color: var(--muted); margin: 4px 0 0 22px; line-height: 1.35; }
+  .task { flex: 1; margin-top: 16px; background: var(--panel2); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .task .state { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--claude); display: flex; align-items: center; gap: 8px; }
+  .task .state.idle { color: var(--dim); }
+  .task .state.waiting { color: var(--amber); }
+  .pulse { width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .task .ttl { font-size: 22px; font-weight: 700; margin: 8px 0 4px; line-height: 1.2; }
+  .task .det { font-size: 15px; color: var(--muted); line-height: 1.35; }
+  .steps { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; overflow: hidden; }
+  .step { font-size: 15px; display: flex; gap: 8px; color: var(--muted); }
+  .step b { width: 16px; flex: none; text-align: center; font-weight: 400; }
+  .step.done { color: var(--dim); } .step.done b { color: var(--green); }
+  .step.active { color: var(--fg); } .step.active b { color: var(--claude); }
+  .upd { font-size: 12px; color: var(--dim); margin-top: auto; padding-top: 8px; }
+  .gear { position: absolute; top: 16px; right: 18px; background: none; border: 0; color: var(--dim); font-size: 20px; padding: 4px; }
+
+  /* ---------- setup ---------- */
+  #setup { position: fixed; inset: 0; background: rgba(5,6,8,.92); display: none; align-items: center; justify-content: center; z-index: 10; }
+  #setup.show { display: flex; }
+  .sheet { background: var(--panel); border-radius: 20px; padding: 26px 30px; width: min(1100px, 94vw); max-height: 94vh; overflow: auto; user-select: text; -webkit-user-select: text; }
+  .sheet h2 { margin: 0 0 4px; font-size: 24px; }
+  .sheet p { color: var(--muted); margin: 4px 0 14px; font-size: 15px; line-height: 1.4; }
+  .row { display: grid; grid-template-columns: 170px 1fr 54px 40px; gap: 10px; margin-bottom: 8px; }
+  .row input, .fld input { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 11px 12px; font-size: 15px; width: 100%; }
+  .row input[type=color] { padding: 4px; height: 44px; }
+  .fld { margin-bottom: 16px; }
+  .fld label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; letter-spacing: .06em; text-transform: uppercase; }
+  .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .primary { background: var(--green); color: #000; border: 0; border-radius: 12px; padding: 12px 22px; font-size: 16px; font-weight: 700; }
+  .x { background: var(--panel2); border: 0; border-radius: 10px; color: var(--muted); }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <!-- CALENDAR -->
+  <section class="panel" id="cal">
+    <div class="clock"><div class="t mono" id="clk">--:--</div><div class="d" id="dte"></div></div>
+    <div id="next"></div>
+    <div class="agenda" id="agenda"><div class="empty">Loading calendars…</div></div>
+    <button class="gear" id="gear" title="Settings">⚙︎</button>
+  </section>
+
+  <!-- MESSAGES -->
+  <section class="panel" id="msgp">
+    <div class="label">Messages<span class="sp"></span><span class="pill" id="msgcount"></span></div>
+    <div class="msgs" id="msgs"><div class="empty">Loading…</div></div>
+  </section>
+
+  <!-- SPOTIFY -->
+  <section class="panel" id="spot">
+    <div class="label">Now Playing<span class="sp"></span><span class="pill" id="autopill">Auto · office speakers</span></div>
+    <div class="sp-body">
+      <div class="art" id="art">♪</div>
+      <div class="sp-info">
+        <div class="track" id="track">Spotify</div>
+        <div class="artist" id="artist">Connecting…</div>
+        <div class="prog"><span class="mono" id="pos">0:00</span><div class="bar"><i id="fill"></i></div><span class="mono" id="dur">0:00</span></div>
+        <div class="ctrls">
+          <button class="cb" id="prev" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+          <button class="cb play" id="play" aria-label="Play or pause"><svg viewBox="0 0 24 24" id="playicon"><path d="M7 4v16l13-8z"/></svg></button>
+          <button class="cb" id="next2" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
+          <button class="cb sm" id="vdn" aria-label="Volume down">−</button>
+          <button class="cb sm" id="vup" aria-label="Volume up">+</button>
+        </div>
+        <button class="dev" id="dev"><svg viewBox="0 0 24 24"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm7 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM12 5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/></svg><span id="devname">No device</span></button>
+      </div>
+    </div>
+    <div class="toast" id="sptoast"></div>
+  </section>
+
+  <!-- CLAUDE -->
+  <section class="panel" id="cl">
+    <div class="label"><span style="color:var(--claude)">✳︎</span> Claude</div>
+    <div class="svc" id="svc"><i></i><span id="svctext">Checking service status…</span></div>
+    <div class="svc-sub" id="svcsub"></div>
+    <div class="task" id="task"></div>
+  </section>
+</div>
+
+<!-- SETUP -->
+<div id="setup">
+  <div class="sheet">
+    <h2>Command Center settings</h2>
+    <p>These stay on this Mac. Calendar links are private: anyone with one can read that calendar, so don't share them.</p>
+    <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
+    <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
+    <hr>
+    <div class="fld"><label>Calendars (private iCal / ICS links)</label></div>
+    <div id="calrows"></div>
+    <button class="ghost" id="addcal">+ Add calendar</button>
+    <div class="actions">
+      <button class="ghost" id="spotlogout">Disconnect Spotify</button>
+      <button class="ghost" id="cancel">Cancel</button>
+      <button class="primary" id="save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="ical.min.js"></script>
+<script>
+(function () {
+"use strict";
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("cc." + k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("cc." + k, v); } catch (e) {} },
+  del(k) { try { localStorage.removeItem("cc." + k); } catch (e) {} }
+};
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1"];
+
+/* =========================================================
+   CLOCK
+   ========================================================= */
+function fmtTime(d) { return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+function tickClock() {
+  const n = new Date();
+  $("clk").textContent = fmtTime(n).replace(/\s?[AP]M$/i, "");
+  $("dte").textContent = n.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+tickClock(); setInterval(tickClock, 1000);
+
+/* =========================================================
+   CALENDAR
+   ========================================================= */
+let calendars = [];   // [{name,color}]
+let events = [];      // [{title,start,end,allDay,loc,color,cal}]
+let calError = "";
+
+function dayStart(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+
+function parseIcs(text, cal) {
+  const out = [];
+  const comp = new ICAL.Component(ICAL.parse(text));
+  comp.getAllSubcomponents("vtimezone").forEach(tz => { try { ICAL.TimezoneService.register(tz); } catch (e) {} });
+  const winStart = dayStart(new Date());
+  const winEnd = new Date(winStart.getTime() + 2 * 86400000);
+  const vevents = comp.getAllSubcomponents("vevent");
+  const masters = {}, exceptions = [];
+  vevents.forEach(v => {
+    const ev = new ICAL.Event(v);
+    if (ev.isRecurrenceException()) exceptions.push(ev); else masters[ev.uid] = masters[ev.uid] || ev;
+    if (!ev.isRecurrenceException() && ev.isRecurring()) masters[ev.uid] = ev;
+  });
+  exceptions.forEach(ex => { const m = masters[ex.uid]; if (m && m.isRecurring()) { try { m.relateException(ex); } catch (e) {} } });
+
+  const push = (summary, s, e, loc, status) => {
+    if (status && String(status).toUpperCase() === "CANCELLED") return;
+    const allDay = s.isDate;
+    const start = s.toJSDate(), end = e ? e.toJSDate() : new Date(start.getTime() + (allDay ? 86400000 : 3600000));
+    if (end <= winStart || start >= winEnd) return;
+    out.push({ title: summary || "(No title)", start, end, allDay, loc: loc || "", color: cal.color, cal: cal.name });
+  };
+
+  Object.values(masters).forEach(ev => {
+    if (!ev.isRecurring()) {
+      push(ev.summary, ev.startDate, ev.endDate, ev.location, ev.component.getFirstPropertyValue("status"));
+      return;
+    }
+    const it = ev.iterator();
+    let next, guard = 0;
+    while ((next = it.next()) && guard++ < 3000) {
+      const js = next.toJSDate();
+      if (js >= winEnd) break;
+      let det;
+      try { det = ev.getOccurrenceDetails(next); } catch (e) { continue; }
+      const it2 = det.item;
+      push(it2.summary, det.startDate, det.endDate, it2.location, it2.component.getFirstPropertyValue("status"));
+    }
+  });
+  // exceptions whose master is missing
+  exceptions.forEach(ex => { if (!masters[ex.uid]) push(ex.summary, ex.startDate, ex.endDate, ex.location, ex.component.getFirstPropertyValue("status")); });
+  return out;
+}
+
+async function loadCalendars() {
+  try {
+    const cfg = await (await fetch("/api/config")).json();
+    calendars = cfg.calendars.map((c, i) => ({ name: c.name, color: c.color || PALETTE[i % PALETTE.length] }));
+  } catch (e) { calError = "Can't reach the local server."; renderCal(); return; }
+  if (!calendars.length) { calError = ""; events = []; renderCal(); return; }
+  const all = [], failed = [];
+  await Promise.all(calendars.map(async (cal, i) => {
+    try {
+      const r = await fetch("/api/ics?i=" + i);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      all.push(...parseIcs(await r.text(), cal));
+    } catch (e) { console.error("calendar", cal.name, e); failed.push(cal.name); }
+  }));
+  // de-duplicate the same event appearing on two calendars
+  const seen = new Set();
+  events = all.filter(e => { const k = e.title + "|" + e.start.getTime(); if (seen.has(k)) return false; seen.add(k); return true; })
+              .sort((a, b) => a.start - b.start);
+  calError = failed.length ? "Couldn't load: " + failed.join(", ") : "";
+  renderCal();
+}
+
+function rel(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return m + " min";
+  const h = Math.floor(m / 60), r = m % 60;
+  return h + " hr" + (r ? " " + r + " min" : "");
+}
+function evRange(e) { return e.allDay ? "All day" : fmtTime(e.start) + " – " + fmtTime(e.end); }
+
+function renderCal() {
+  const now = new Date();
+  const today0 = dayStart(now), tom0 = new Date(today0.getTime() + 86400000), tom1 = new Date(tom0.getTime() + 86400000);
+  const today = events.filter(e => e.start < tom0 && e.end > today0);
+  const tomorrow = events.filter(e => e.start >= tom0 && e.start < tom1);
+  const timed = today.filter(e => !e.allDay);
+  const allday = today.filter(e => e.allDay);
+
+  // Next up / Now
+  const current = timed.find(e => e.start <= now && e.end > now);
+  const upcoming = timed.find(e => e.start > now) || tomorrow.find(e => !e.allDay);
+  let nh = "";
+  if (current) {
+    nh = `<div class="next now"><div class="k">Now · <b>ends in ${rel(current.end - now)}</b></div>
+      <div class="title">${esc(current.title)}</div><div class="meta">${esc(evRange(current))}${current.loc ? " · " + esc(current.loc) : ""}</div></div>`;
+  } else if (upcoming) {
+    const isTom = upcoming.start >= tom0;
+    nh = `<div class="next" style="border-left-color:${esc(upcoming.color)}"><div class="k">Next up · <b>${isTom ? "tomorrow " + fmtTime(upcoming.start) : "in " + rel(upcoming.start - now)}</b></div>
+      <div class="title">${esc(upcoming.title)}</div><div class="meta">${esc(evRange(upcoming))}${upcoming.loc ? " · " + esc(upcoming.loc) : ""} · ${esc(upcoming.cal)}</div></div>`;
+  }
+  $("next").innerHTML = nh;
+
+  if (!calendars.length) {
+    $("agenda").innerHTML = `<div class="empty">No calendars yet.<br><button class="ghost" style="margin-top:12px" onclick="document.getElementById('gear').click()">Add your calendars</button></div>`;
+    return;
+  }
+  let h = "";
+  if (allday.length) h += `<div class="allday">${allday.map(e => `<span style="box-shadow:inset 3px 0 0 ${esc(e.color)}">${esc(e.title)}</span>`).join("")}</div>`;
+  const remaining = timed.filter(e => e.end > now);
+  const past = timed.filter(e => e.end <= now).slice(-1);
+  const rows = past.concat(remaining).slice(0, 8);
+  rows.forEach(e => {
+    const cls = e.end <= now ? "past" : (e.start <= now ? "cur" : "");
+    h += `<div class="ev ${cls}"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></div>`;
+  });
+  if (!remaining.length) {
+    h += `<div class="empty" style="margin:6px 0;font-size:17px">Nothing else today.</div>`;
+    const tl = tomorrow.filter(e => !e.allDay).slice(0, 4);
+    if (tl.length) {
+      h += `<div class="subhead">Tomorrow</div>`;
+      tl.forEach(e => { h += `<div class="ev"><span class="tm mono">${esc(fmtTime(e.start))}</span><span class="dot" style="background:${esc(e.color)}"></span><span class="nm">${esc(e.title)}</span></div>`; });
+    }
+  }
+  if (calError) h += `<div class="err" style="margin-top:auto">${esc(calError)}</div>`;
+  $("agenda").innerHTML = h;
+}
+loadCalendars(); setInterval(loadCalendars, 5 * 60000); setInterval(renderCal, 30000);
+
+/* =========================================================
+   MESSAGES
+   ========================================================= */
+function ago(t) {
+  const s = (Date.now() - t) / 1000;
+  if (s < 60) return "now";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  if (s < 86400) return Math.floor(s / 3600) + "h";
+  return new Date(t).toLocaleDateString([], { month: "short", day: "numeric" });
+}
+async function loadMessages() {
+  let d;
+  try { d = await (await fetch("/api/messages")).json(); }
+  catch (e) { $("msgs").innerHTML = `<div class="err">Can't reach the local server.</div>`; return; }
+  if (!d.ok) {
+    $("msgcount").textContent = "";
+    $("msgs").innerHTML = d.error === "no_access"
+      ? `<div class="empty">Messages needs one more permission.<br><span style="font-size:15px">System Settings → Privacy &amp; Security → Full Disk Access → turn on <b>Terminal</b>, then run Stop and Start Command Center again.</span></div>`
+      : `<div class="empty">Messages isn't set up on this Mac.</div>`;
+    return;
+  }
+  const list = d.messages.slice(0, 6);
+  const unread = d.messages.filter(m => m.unread).length;
+  $("msgcount").textContent = unread ? unread + " unread" : "";
+  $("msgs").innerHTML = list.length ? list.map(m => `
+    <div class="msg ${m.unread ? "unread" : ""}">
+      <div class="top"><span class="who">${esc(m.from)}</span>${m.group ? `<span class="grp">in ${esc(m.group)}</span>` : ""}<span class="when">${esc(ago(m.time))}</span></div>
+      <div class="body">${esc(m.text)}</div>
+    </div>`).join("") : `<div class="empty">No messages.</div>`;
+}
+loadMessages(); setInterval(loadMessages, 15000);
+
+/* =========================================================
+   SPOTIFY (PKCE: no secret needed, tokens stay in this browser)
+   ========================================================= */
+const REDIRECT = location.origin + "/callback";
+const SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
+const API = "https://api.spotify.com/v1/me/player";
+let spState = null, spFetched = 0, spTimer = null, lastAutoMove = 0;
+
+function officeName() { return (store.get("officeName", "office speakers") || "office speakers").trim().toLowerCase(); }
+function spToast(msg) { $("sptoast").textContent = msg || ""; if (msg) setTimeout(() => { if ($("sptoast").textContent === msg) $("sptoast").textContent = ""; }, 7000); }
+
+function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+async function spLogin() {
+  const cid = store.get("spotifyClientId", "");
+  if (!cid) { openSetup(); return; }
+  const arr = new Uint8Array(48); crypto.getRandomValues(arr);
+  const verifier = b64url(arr);
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  store.set("pkce", verifier);
+  location.href = "https://accounts.spotify.com/authorize?" + new URLSearchParams({
+    response_type: "code", client_id: cid, scope: SCOPES, redirect_uri: REDIRECT,
+    code_challenge_method: "S256", code_challenge: challenge
+  });
+}
+async function tokenRequest(params) {
+  const r = await fetch("https://accounts.spotify.com/api/token", {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(params)
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) throw { auth: true, detail: j.error_description || j.error || ("HTTP " + r.status) };
+  store.set("spAccess", j.access_token);
+  store.set("spExpires", String(Date.now() + (j.expires_in || 3600) * 1000));
+  if (j.refresh_token) store.set("spRefresh", j.refresh_token);
+  return j.access_token;
+}
+async function handleCallback() {
+  if (location.pathname !== "/callback") return;
+  const q = new URLSearchParams(location.search);
+  history.replaceState(null, "", "/");
+  if (q.get("error")) { spToast("Spotify sign-in was cancelled."); return; }
+  const code = q.get("code"), verifier = store.get("pkce", "");
+  if (!code || !verifier) return;
+  try {
+    await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: store.get("spotifyClientId", ""), code_verifier: verifier });
+  } catch (e) { spToast("Spotify sign-in failed: " + (e.detail || e)); }
+  store.del("pkce");
+}
+async function token() {
+  const t = store.get("spAccess", ""), exp = +store.get("spExpires", "0");
+  if (t && Date.now() < exp - 60000) return t;
+  const rt = store.get("spRefresh", "");
+  if (!rt) throw { needLogin: true };
+  return tokenRequest({ grant_type: "refresh_token", refresh_token: rt, client_id: store.get("spotifyClientId", "") });
+}
+async function sp(method, path, body, retried) {
+  const t = await token();
+  const r = await fetch(API + path, {
+    method, headers: Object.assign({ Authorization: "Bearer " + t }, body ? { "Content-Type": "application/json" } : {}),
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (r.status === 401 && !retried) { store.set("spExpires", "0"); return sp(method, path, body, true); }
+  return r;
+}
+
+async function findOffice() {
+  const r = await sp("GET", "/devices");
+  if (!r.ok) return null;
+  const j = await r.json();
+  const want = officeName();
+  return (j.devices || []).find(d => (d.name || "").trim().toLowerCase() === want)
+      || (j.devices || []).find(d => (d.name || "").toLowerCase().includes(want)) || null;
+}
+async function moveToOffice(play) {
+  const dev = await findOffice();
+  if (!dev) { spToast(`"${store.get("officeName", "office speakers")}" isn't visible to Spotify right now. Pick it once in the Spotify app, then try again.`); return false; }
+  const r = await sp("PUT", "", { device_ids: [dev.id], play: !!play });
+  if (!r.ok && r.status !== 204) { spToast("Couldn't switch speakers (" + r.status + ")."); return false; }
+  setTimeout(spPoll, 1200);
+  return true;
+}
+
+function fmtMs(ms) { ms = Math.max(0, ms || 0); const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+function setPlayIcon(playing) {
+  $("playicon").innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4v16l13-8z"/>';
+}
+function spRender() {
+  const s = spState, item = s && s.item;
+  const autoOn = store.get("autoOffice", "1") === "1";
+  $("autopill").textContent = autoOn ? "Auto · " + store.get("officeName", "office speakers") : "Auto off";
+  if (!item) {
+    $("art").style.backgroundImage = ""; $("art").textContent = "♪";
+    $("track").textContent = "Nothing playing";
+    $("artist").textContent = "Tap play to start on " + store.get("officeName", "office speakers");
+    setPlayIcon(false);
+    $("pos").textContent = "0:00"; $("dur").textContent = "0:00"; $("fill").style.width = "0";
+  } else {
+    const ep = item.type === "episode";
+    const imgs = ep ? (item.images || (item.show && item.show.images) || []) : ((item.album && item.album.images) || []);
+    if (imgs.length) { $("art").style.backgroundImage = `url("${imgs[0].url}")`; $("art").textContent = ""; }
+    else { $("art").style.backgroundImage = ""; $("art").textContent = "♪"; }
+    $("track").textContent = item.name || "";
+    $("artist").textContent = ep ? ((item.show && item.show.name) || "") : (item.artists || []).map(a => a.name).join(", ");
+    setPlayIcon(s.is_playing);
+    spTick();
+  }
+  const dn = s && s.device ? s.device.name : "No active device";
+  $("devname").textContent = dn;
+  $("dev").classList.toggle("office", !!(s && s.device && (s.device.name || "").trim().toLowerCase() === officeName()));
+}
+function spTick() {
+  const s = spState, item = s && s.item;
+  if (!item) return;
+  let p = s.progress_ms || 0;
+  if (s.is_playing) p += Date.now() - spFetched;
+  p = Math.min(p, item.duration_ms || 0);
+  $("pos").textContent = fmtMs(p); $("dur").textContent = fmtMs(item.duration_ms);
+  $("fill").style.width = item.duration_ms ? (100 * p / item.duration_ms).toFixed(2) + "%" : "0";
+}
+setInterval(spTick, 500);
+
+function spNeedsLogin(msg) {
+  $("track").textContent = "Connect Spotify";
+  $("artist").innerHTML = `<button class="ghost" id="splogin" style="margin-top:6px">${esc(msg || "Sign in with Spotify")}</button>`;
+  $("splogin").onclick = spLogin;
+}
+async function spPoll() {
+  clearTimeout(spTimer);
+  if (!store.get("spotifyClientId", "")) { spNeedsLogin("Add your Spotify Client ID"); $("splogin").onclick = openSetup; return; }
+  try {
+    const r = await sp("GET", "?additional_types=episode");
+    if (r.status === 204) { spState = null; spFetched = Date.now(); }
+    else if (r.ok) { spState = await r.json(); spFetched = Date.now(); }
+    else if (r.status === 429) spToast("Spotify asked us to slow down.");
+    spRender();
+    // "Always office speakers": if music starts on this Mac, move it to the speakers
+    const autoOn = store.get("autoOffice", "1") === "1";
+    if (autoOn && spState && spState.is_playing && spState.device && spState.device.type === "Computer"
+        && (spState.device.name || "").trim().toLowerCase() !== officeName() && Date.now() - lastAutoMove > 60000) {
+      lastAutoMove = Date.now();
+      moveToOffice(true);
+    }
+  } catch (e) {
+    if (e && e.needLogin) { spNeedsLogin(); return; }
+    if (e && e.auth) { store.del("spRefresh"); spNeedsLogin("Reconnect Spotify"); return; }
+    spToast("Offline. Retrying…");
+  }
+  spTimer = setTimeout(spPoll, spState && spState.is_playing ? 4000 : 10000);
+}
+
+async function spControl(fn) { try { await fn(); } catch (e) { if (e && (e.needLogin || e.auth)) spNeedsLogin(); else spToast("Spotify didn't respond."); } setTimeout(spPoll, 700); }
+$("play").onclick = () => spControl(async () => {
+  if (!spState || !spState.device) { await moveToOffice(true); return; }
+  const playing = spState.is_playing;
+  setPlayIcon(!playing);
+  const r = await sp("PUT", playing ? "/pause" : "/play");
+  if (r.status === 404) await moveToOffice(true);
+  else if (r.status === 403) spToast("Spotify refused that right now.");
+});
+$("prev").onclick = () => spControl(() => sp("POST", "/previous"));
+$("next2").onclick = () => spControl(() => sp("POST", "/next"));
+function vol(delta) {
+  spControl(async () => {
+    const cur = spState && spState.device && spState.device.volume_percent;
+    if (cur == null) { spToast("This speaker doesn't allow volume control from here."); return; }
+    const v = Math.max(0, Math.min(100, cur + delta));
+    spState.device.volume_percent = v;
+    await sp("PUT", "/volume?volume_percent=" + v);
+  });
+}
+$("vdn").onclick = () => vol(-8);
+$("vup").onclick = () => vol(8);
+$("dev").onclick = () => spControl(() => moveToOffice(spState ? spState.is_playing : true));
+$("autopill").onclick = () => { store.set("autoOffice", store.get("autoOffice", "1") === "1" ? "0" : "1"); spRender(); };
+$("autopill").style.cursor = "pointer";
+
+/* =========================================================
+   CLAUDE
+   ========================================================= */
+async function loadService() {
+  try {
+    const d = await (await fetch("https://status.claude.com/api/v2/summary.json", { cache: "no-store" })).json();
+    const ind = d.status.indicator;
+    $("svc").className = "svc " + (ind === "none" ? "ok" : ind);
+    $("svctext").textContent = d.status.description;
+    const bad = (d.components || []).filter(c => c.status !== "operational" && !c.group);
+    const inc = (d.incidents || []).filter(i => i.status !== "resolved");
+    $("svcsub").textContent = inc.length ? inc[0].name : (bad.length ? bad.map(c => c.name + " (" + c.status.replace(/_/g, " ") + ")").join(", ") : "");
+  } catch (e) {
+    $("svc").className = "svc"; $("svctext").textContent = "Status unavailable"; $("svcsub").textContent = "";
+  }
+}
+async function loadTask() {
+  let s;
+  try { s = await (await fetch("/api/claude")).json(); } catch (e) { return; }
+  const state = s.state || "idle";
+  const upd = s.updated ? new Date(s.updated) : null;
+  const stale = upd && Date.now() - upd > 2 * 3600 * 1000;
+  if (state === "idle" || !s.task || stale) {
+    $("task").innerHTML = `<div class="state idle">Idle</div><div class="det" style="margin-top:10px">Nothing in progress.${s.task && stale ? `<br><br>Last: ${esc(s.task)}` : ""}</div>${upd ? `<div class="upd">Updated ${esc(upd.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }))}</div>` : ""}`;
+    return;
+  }
+  const label = state === "waiting" ? "Waiting on you" : state === "done" ? "Done" : "Working";
+  const steps = (s.steps || []).slice(0, 7).map(st => `<div class="step ${esc(st.state || "")}"><b>${st.state === "done" ? "✓" : st.state === "active" ? "›" : "·"}</b><span>${esc(st.label)}</span></div>`).join("");
+  $("task").innerHTML = `<div class="state ${esc(state)}">${state === "working" ? '<span class="pulse"></span>' : ""}${label}</div>
+    <div class="ttl">${esc(s.task)}</div>${s.detail ? `<div class="det">${esc(s.detail)}</div>` : ""}
+    <div class="steps">${steps}</div>${upd ? `<div class="upd">Updated ${esc(fmtTime(upd))}</div>` : ""}`;
+}
+loadService(); setInterval(loadService, 120000);
+loadTask(); setInterval(loadTask, 8000);
+
+/* =========================================================
+   SETUP
+   ========================================================= */
+function calRow(c, i) {
+  const d = document.createElement("div"); d.className = "row";
+  d.innerHTML = `<input class="cn" placeholder="Name" value="${esc(c.name || "")}">
+    <input class="cu" placeholder="${c.hasUrl ? "Saved (paste a new link to replace)" : "https://… .ics link"}" spellcheck="false">
+    <input class="cc" type="color" value="${esc(c.color || PALETTE[i % PALETTE.length])}">
+    <button class="x" title="Remove">✕</button>`;
+  d.dataset.has = c.hasUrl ? "1" : "";
+  d.querySelector(".x").onclick = () => d.remove();
+  return d;
+}
+async function openSetup() {
+  $("cid").value = store.get("spotifyClientId", "");
+  $("officeName").value = store.get("officeName", "office speakers");
+  let cfg = { calendars: [] };
+  try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
+  const box = $("calrows"); box.innerHTML = "";
+  (cfg.calendars.length ? cfg.calendars : [{ name: "Google" }, { name: "Outlook" }]).forEach((c, i) => box.appendChild(calRow(c, i)));
+  $("setup").classList.add("show");
+}
+$("gear").onclick = openSetup;
+$("addcal").onclick = () => $("calrows").appendChild(calRow({ name: "" }, $("calrows").children.length));
+$("cancel").onclick = () => $("setup").classList.remove("show");
+$("spotlogout").onclick = () => { ["spAccess", "spRefresh", "spExpires"].forEach(store.del); spState = null; $("setup").classList.remove("show"); spPoll(); };
+$("save").onclick = async () => {
+  const oldCid = store.get("spotifyClientId", "");
+  store.set("spotifyClientId", $("cid").value.trim());
+  store.set("officeName", $("officeName").value.trim() || "office speakers");
+  const cals = [...$("calrows").children].map(r => ({
+    name: r.querySelector(".cn").value.trim() || "Calendar",
+    color: r.querySelector(".cc").value,
+    url: r.querySelector(".cu").value.trim() || (r.dataset.has ? "__keep__" : "")
+  })).filter(c => c.url);
+  try { await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: cals }) }); } catch (e) {}
+  $("setup").classList.remove("show");
+  if (oldCid !== store.get("spotifyClientId", "")) ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
+  loadCalendars(); spPoll();
+};
+
+/* start */
+handleCallback().then(spPoll);
+})();
+</script>
+</body>
+</html>

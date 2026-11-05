@@ -1,0 +1,6 @@
+config.json
+config.json.tmp
+claude-status.json
+__pycache__/
+*.log
+.DS_Store

@@ -1,0 +1,11 @@
+{
+  "state": "working",
+  "task": "Drafting the quarterly report",
+  "detail": "Pulling numbers from the sales sheet",
+  "steps": [
+    {"label": "Collect the data", "state": "done"},
+    {"label": "Write the summary", "state": "active"},
+    {"label": "Build the charts", "state": "todo"}
+  ],
+  "updated": "2026-11-05T16:40:00Z"
+}
