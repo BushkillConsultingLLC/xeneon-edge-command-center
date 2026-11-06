@@ -125,6 +125,12 @@
   /* ---------- setup ---------- */
   #setup { position: fixed; inset: 0; background: rgba(5,6,8,.92); display: none; align-items: center; justify-content: center; z-index: 10; }
   #setup.show { display: flex; }
+  body.settings-page { overflow: auto; }
+  body.settings-page .grid, body.settings-page .gear { display: none; }
+  body.settings-page #setup { position: static; display: flex; background: var(--bg); min-height: 100vh; align-items: flex-start; padding: 40px 0; }
+  body.settings-page .sheet { max-height: none; }
+  body.settings-page .actions { bottom: 0; }
+  .saved { color: var(--green); font-size: 15px; margin-right: auto; align-self: center; }
   .sheet { background: var(--panel); border-radius: 20px; padding: 26px 30px; width: min(1100px, 94vw); max-height: 94vh; overflow: auto; user-select: text; -webkit-user-select: text; }
   .sheet h2 { margin: 0 0 4px; font-size: 24px; }
   .sheet p { color: var(--muted); margin: 4px 0 14px; font-size: 15px; line-height: 1.4; }
@@ -210,12 +216,17 @@
     <div id="spotFields">
       <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
       <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
+      <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
       <hr>
     </div>
+    <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
+    <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
+    <hr>
     <div class="fld"><label>Calendars (private iCal / ICS links)</label></div>
     <div id="calrows"></div>
     <button class="ghost" id="addcal">+ Add calendar</button>
     <div class="actions">
+      <span class="saved" id="savedmsg"></span>
       <button class="ghost" id="spotlogout">Disconnect Spotify</button>
       <button class="ghost" id="cancel">Cancel</button>
       <button class="primary" id="save">Save</button>
@@ -252,13 +263,53 @@ function applyLayout() {
     if (p.on) cols.push(SIZE_FR[p.size] || "1fr");
   });
   document.querySelector(".grid").style.gridTemplateColumns = cols.join(" ") || "1fr";
+  if (SETTINGS_PAGE) return;     // the settings tab shows no panels
   applyAi();
   applyMusicMode();
 }
+let prefs = { spotifyClientId: "", speaker: "office speakers", fullscreen: true, spotifyReset: 0 };
+let cfgRev = -1;
+const SETTINGS_PAGE = new URLSearchParams(location.search).has("settings");
 async function loadLayout() {
-  try { const c = await (await fetch("/api/config")).json(); if (c.layout) layout = c.layout; } catch (e) {}
+  try {
+    const c = await (await fetch("/api/config")).json();
+    if (c.layout) layout = c.layout;
+    if (c.prefs) prefs = c.prefs;
+    cfgRev = c.rev || 0;
+    // one-time move of settings that older versions kept only in this window
+    const oldCid = store.get("spotify" + "ClientId", "");
+    if (!prefs.spotifyClientId && oldCid && !SETTINGS_PAGE) {
+      prefs.spotifyClientId = oldCid;
+      prefs.speaker = store.get("officeName", prefs.speaker);
+      await postConfig({ prefs: { spotifyClientId: prefs.spotifyClientId, speaker: prefs.speaker } });
+    }
+    store.set("spReset", store.get("spReset", String(prefs.spotifyReset || 0)));
+  } catch (e) {}
   applyLayout();
 }
+async function postConfig(body) {
+  const r = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+  if (r.layout) layout = r.layout;
+  return r;
+}
+// The Edge checks for changes saved from the settings page on the main screen
+async function watchConfig() {
+  if (SETTINGS_PAGE) return;
+  try {
+    const c = await (await fetch("/api/config")).json();
+    if (cfgRev >= 0 && c.rev !== cfgRev) {
+      const oldCid = prefs.spotifyClientId;
+      layout = c.layout || layout; prefs = c.prefs || prefs; cfgRev = c.rev;
+      if (oldCid !== prefs.spotifyClientId || String(prefs.spotifyReset || 0) !== store.get("spReset", "0")) {
+        ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
+        store.set("spReset", String(prefs.spotifyReset || 0));
+        spState = null;
+      }
+      applyLayout(); loadCalendars();
+    } else cfgRev = c.rev;
+  } catch (e) {}
+}
+setInterval(watchConfig, 5000);
 
 /* =========================================================
    CLOCK
@@ -482,12 +533,12 @@ const SCOPES = "user-read-playback-state user-modify-playback-state user-read-cu
 const API = "https://api.spotify.com/v1/me/player";
 let spState = null, spFetched = 0, spTimer = null, lastAutoMove = 0;
 
-function officeName() { return (store.get("officeName", "office speakers") || "office speakers").trim().toLowerCase(); }
+function officeName() { return (prefs.speaker || "office speakers").trim().toLowerCase(); }
 function spToast(msg) { $("sptoast").textContent = msg || ""; if (msg) setTimeout(() => { if ($("sptoast").textContent === msg) $("sptoast").textContent = ""; }, 7000); }
 
 function b64url(buf) { return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 async function spLogin() {
-  const cid = store.get("spotifyClientId", "");
+  const cid = (prefs.spotifyClientId || "");
   if (!cid) { openSetup(); return; }
   const arr = new Uint8Array(48); crypto.getRandomValues(arr);
   const verifier = b64url(arr);
@@ -517,7 +568,7 @@ async function handleCallback() {
   const code = q.get("code"), verifier = store.get("pkce", "");
   if (!code || !verifier) return;
   try {
-    await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: store.get("spotifyClientId", ""), code_verifier: verifier });
+    await tokenRequest({ grant_type: "authorization_code", code, redirect_uri: REDIRECT, client_id: (prefs.spotifyClientId || ""), code_verifier: verifier });
   } catch (e) { spToast("Spotify sign-in failed: " + (e.detail || e)); }
   store.del("pkce");
 }
@@ -526,7 +577,7 @@ async function token() {
   if (t && Date.now() < exp - 60000) return t;
   const rt = store.get("spRefresh", "");
   if (!rt) throw { needLogin: true };
-  return tokenRequest({ grant_type: "refresh_token", refresh_token: rt, client_id: store.get("spotifyClientId", "") });
+  return tokenRequest({ grant_type: "refresh_token", refresh_token: rt, client_id: (prefs.spotifyClientId || "") });
 }
 async function sp(method, path, body, retried) {
   const t = await token();
@@ -548,7 +599,7 @@ async function findOffice() {
 }
 async function moveToOffice(play) {
   const dev = await findOffice();
-  if (!dev) { spToast(`"${store.get("officeName", "office speakers")}" isn't visible to Spotify right now. Pick it once in the Spotify app, then try again.`); return false; }
+  if (!dev) { spToast(`"${(prefs.speaker || "office speakers")}" isn't visible to Spotify right now. Pick it once in the Spotify app, then try again.`); return false; }
   const r = await sp("PUT", "", { device_ids: [dev.id], play: !!play });
   if (!r.ok && r.status !== 204) { spToast("Couldn't switch speakers (" + r.status + ")."); return false; }
   setTimeout(spPoll, 1200);
@@ -562,11 +613,11 @@ function setPlayIcon(playing) {
 function spRender() {
   const s = spState, item = s && s.item;
   const autoOn = store.get("autoOffice", "1") === "1";
-  $("autopill").textContent = autoOn ? "Auto · " + store.get("officeName", "office speakers") : "Auto off";
+  $("autopill").textContent = autoOn ? "Auto · " + (prefs.speaker || "office speakers") : "Auto off";
   if (!item) {
     $("art").style.backgroundImage = ""; $("art").textContent = "♪";
     $("track").textContent = "Nothing playing";
-    $("artist").textContent = "Tap play to start on " + store.get("officeName", "office speakers");
+    $("artist").textContent = "Tap play to start on " + (prefs.speaker || "office speakers");
     setPlayIcon(false);
     $("pos").textContent = "0:00"; $("dur").textContent = "0:00"; $("fill").style.width = "0";
   } else {
@@ -603,7 +654,7 @@ function spNeedsLogin(msg) {
 async function spPoll() {
   clearTimeout(spTimer);
   if (layout.music !== "spotify") return;
-  if (!store.get("spotifyClientId", "")) { spNeedsLogin("Add your Spotify Client ID"); $("splogin").onclick = openSetup; return; }
+  if (!(prefs.spotifyClientId || "")) { spNeedsLogin("Add your Spotify Client ID"); $("splogin").onclick = openSettings; return; }
   try {
     const r = await sp("GET", "?additional_types=episode");
     if (r.status === 204) { spState = null; spFetched = Date.now(); }
@@ -664,6 +715,7 @@ function applyMusicMode() {
     amPoll();
   } else {
     $("autopill").style.cursor = "pointer";
+    $("autopill").textContent = store.get("autoOffice", "1") === "1" ? "Auto · " + (prefs.speaker || "office speakers") : "Auto off";
     spPoll();
   }
 }
@@ -818,22 +870,39 @@ async function openSetup() {
   $("musicSrc").value = layout.music; $("musicSrc").onchange();
   $("aiSrc").value = layout.ai;
   $("aiTask").checked = !!layout.aiTask;
-  $("cid").value = store.get("spotifyClientId", "");
-  $("officeName").value = store.get("officeName", "office speakers");
+  $("cid").value = prefs.spotifyClientId || "";
+  $("officeName").value = prefs.speaker || "office speakers";
+  $("fullscreen").checked = prefs.fullscreen !== false;
+  $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
   const box = $("calrows"); box.innerHTML = "";
   (cfg.calendars.length ? cfg.calendars : [{ name: "Google" }, { name: "Outlook" }]).forEach((c, i) => box.appendChild(calRow(c, i)));
   $("setup").classList.add("show");
 }
-$("gear").onclick = openSetup;
+// On the Edge, settings open in the normal browser on the main screen, where typing works.
+async function openSettings() {
+  try {
+    const r = await (await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "settings" }) })).json();
+    if (r.ok) return;
+  } catch (e) {}
+  openSetup();   // fallback: edit right here
+}
+$("gear").onclick = () => SETTINGS_PAGE ? openSetup() : openSettings();
+$("restart").onclick = () => macOpen({ kind: "restart" }, $("restart"));
 $("addcal").onclick = () => $("calrows").appendChild(calRow({ name: "" }, $("calrows").children.length));
-$("cancel").onclick = () => $("setup").classList.remove("show");
-$("spotlogout").onclick = () => { ["spAccess", "spRefresh", "spExpires"].forEach(store.del); spState = null; $("setup").classList.remove("show"); spPoll(); };
+$("cancel").onclick = () => {
+  if (SETTINGS_PAGE) { window.close(); $("savedmsg").textContent = "You can close this tab."; return; }
+  $("setup").classList.remove("show");
+};
+$("spotlogout").onclick = async () => {
+  try { await postConfig({ prefs: { spotifyReset: true } }); } catch (e) {}
+  if (SETTINGS_PAGE) { $("savedmsg").textContent = "Spotify disconnected on the Edge."; return; }
+  ["spAccess", "spRefresh", "spExpires"].forEach(store.del); spState = null; $("setup").classList.remove("show"); spPoll();
+};
 $("save").onclick = async () => {
-  const oldCid = store.get("spotifyClientId", "");
-  store.set("spotifyClientId", $("cid").value.trim());
-  store.set("officeName", $("officeName").value.trim() || "office speakers");
+  const oldCid = prefs.spotifyClientId || "";
+  const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked };
   const cals = [...$("calrows").children].map(r => ({
     name: r.querySelector(".cn").value.trim() || "Calendar",
     color: r.querySelector(".cc").value,
@@ -841,16 +910,26 @@ $("save").onclick = async () => {
   })).filter(c => c.url);
   const newLayout = { panels: draftPanels, music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
-    const r = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ calendars: cals, layout: newLayout }) })).json();
-    layout = r.layout || newLayout;
+    const r = await postConfig({ calendars: cals, layout: newLayout, prefs: newPrefs });
+    cfgRev = r.rev != null ? r.rev : cfgRev;
   } catch (e) { layout = newLayout; }
+  Object.assign(prefs, newPrefs);
+  if (SETTINGS_PAGE) { await openSetup(); $("savedmsg").textContent = "Saved. The Edge updates within a few seconds."; return; }
   $("setup").classList.remove("show");
-  if (oldCid !== store.get("spotifyClientId", "")) ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
+  if (oldCid !== prefs.spotifyClientId) ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
   applyLayout(); loadCalendars();
 };
 
 /* start */
-handleCallback().then(loadLayout);
+if (SETTINGS_PAGE) {
+  document.body.classList.add("settings-page");
+  document.documentElement.style.overflow = "auto"; document.documentElement.style.height = "auto";
+  document.body.style.height = "auto";
+  document.title = "Command Center settings";
+  loadLayout().then(openSetup);
+} else {
+  handleCallback().then(loadLayout);
+}
 })();
 </script>
 </body>

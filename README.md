@@ -13,7 +13,7 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 | **Now Playing** | **Spotify** or **Apple Music**: album art, track, progress and big touch controls. Spotify can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. Apple Music is controlled directly on the Mac, with no account setup. |
 | **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
 
-**Pick what you see.** Every panel can be turned on or off, resized (narrow, medium, wide) and reordered from the settings sheet (the ⚙︎ in the bottom-right corner). Your choices are saved on the Mac.
+**Pick what you see.** Every panel can be turned on or off, resized (narrow, medium, wide) and reordered. Tap the ⚙︎ in the bottom-right corner of the Edge and settings open in your normal browser **on your main monitor**, where typing works properly. Save, and the Edge updates within a few seconds. (You can also open `http://127.0.0.1:8888/?settings` directly.)
 
 Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, and nothing is sent anywhere except the services you connect (Spotify, your calendar feeds, Claude's public status page).
 
@@ -29,8 +29,8 @@ Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, 
 
 1. Download this repository (**Code → Download ZIP**) and unzip it somewhere permanent, for example `~/Applications/Command Center`.
 2. Double-click **Start Command Center.command**. If macOS blocks it, right-click it and choose **Open**.
-3. The dashboard finds the Edge by itself and opens full screen on it, with no title bar. To close it, click it and press **Command+Q**, or run **Stop Command Center**. (No Edge connected? It opens as a normal window you can drag anywhere.)
-4. Tap the **⚙︎** in the bottom-right corner to choose your panels and connect your accounts (below).
+3. The dashboard finds the Edge by itself and opens full screen on it, with no title bar. Esc doesn't exit, by design. To close it, click it and press **Command+Q**, or run **Stop Command Center**. Prefer a normal window? Untick *Full screen on the Edge* in settings and tap **Restart dashboard now**. (No Edge connected? It opens as a normal window you can drag anywhere.)
+4. Tap the **⚙︎** in the bottom-right corner. Settings open on your main monitor: choose your panels and connect your accounts (below).
 
 To start it automatically, add **Start Command Center.command** to *System Settings → General → Login Items*.
 
@@ -52,7 +52,7 @@ Treat these links like passwords. They're stored in `config.json` next to the se
 
 1. At [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard), create an app.
 2. Add the Redirect URI **`http://127.0.0.1:8888/callback`** exactly, and tick **Web API**.
-3. Copy the app's **Client ID** into the dashboard settings and tap **Sign in with Spotify**.
+3. Copy the app's **Client ID** into settings and save. Then tap **Sign in with Spotify** on the Edge itself (the sign-in has to happen in the dashboard window, since that's where its tokens are kept).
 
 The dashboard uses Spotify's PKCE sign-in, so no client secret is needed. Tokens stay in that Chrome window's local storage.
 
@@ -117,6 +117,7 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | A calendar says "Couldn't load" | The link is wrong or not public. Google's *Public URL* only works for public calendars, so use the *Secret address*. |
 | Messages asks for permission | Turn on Full Disk Access for Terminal, then Stop and Start. |
 | Spotify "speaker isn't visible" | Choose the speaker once in the Spotify app, then tap the speaker chip on the dashboard. |
+| Typing on the Edge doesn't work | Expected: full-screen windows, and the touch driver, hand the keyboard back to your main screen. Use the ⚙︎, which opens settings on the main monitor. |
 | Apple Music says "Allow Terminal to control Music" | *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**. |
 | The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |

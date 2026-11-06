@@ -251,6 +251,24 @@ DEFAULT_LAYOUT = {
 }
 
 
+DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0}
+
+
+def get_prefs():
+    p = dict(DEFAULT_PREFS)
+    saved = load_config().get("prefs") or {}
+    cid = str(saved.get("spotifyClientId", ""))
+    if re.fullmatch(r"[A-Za-z0-9]{0,64}", cid):
+        p["spotifyClientId"] = cid
+    if isinstance(saved.get("speaker"), str) and saved["speaker"].strip():
+        p["speaker"] = saved["speaker"].strip()[:60]
+    if "fullscreen" in saved:
+        p["fullscreen"] = bool(saved["fullscreen"])
+    if isinstance(saved.get("spotifyReset"), (int, float)):
+        p["spotifyReset"] = int(saved["spotifyReset"])
+    return p
+
+
 def get_layout():
     lay = load_config().get("layout") or {}
     out = json.loads(json.dumps(DEFAULT_LAYOUT))
@@ -414,7 +432,8 @@ class Handler(SimpleHTTPRequestHandler):
             cfg = load_config()
             cals = [{"name": c.get("name", ""), "color": c.get("color", ""),
                      "hasUrl": bool(c.get("url"))} for c in cfg.get("calendars", [])]
-            return self._json({"calendars": cals, "layout": get_layout()})
+            return self._json({"calendars": cals, "layout": get_layout(), "prefs": get_prefs(),
+                               "rev": int(cfg.get("rev", 0))})
         if p == "/api/music":
             return self._json(music_state())
         if p == "/api/music/art":
@@ -489,6 +508,17 @@ class Handler(SimpleHTTPRequestHandler):
                     ok = open_meeting(str(body.get("url", "")))
                 elif kind == "messages-app":
                     ok = mac_open(["-a", "Messages"])
+                elif kind == "settings":
+                    # in your normal browser, on the main screen, where typing works
+                    ok = mac_open(["http://127.0.0.1:%d/?settings" % PORT])
+                elif kind == "restart":
+                    start = os.path.join(ROOT, "Start Command Center.command")
+                    try:
+                        subprocess.Popen(["/bin/bash", start], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                         stdin=subprocess.DEVNULL, start_new_session=True)
+                        ok = True
+                    except Exception:
+                        ok = False
                 else:
                     ok = False
                 return self._json({"ok": bool(ok)})
@@ -528,8 +558,19 @@ class Handler(SimpleHTTPRequestHandler):
                 cfg["layout"] = body["layout"]
                 save_config(cfg)
                 cfg["layout"] = get_layout()      # store the cleaned-up version
+            if isinstance(body.get("prefs"), dict):
+                np = dict(cfg.get("prefs") or {})
+                for k in ("spotifyClientId", "speaker", "fullscreen"):
+                    if k in body["prefs"]:
+                        np[k] = body["prefs"][k]
+                if body["prefs"].get("spotifyReset"):
+                    np["spotifyReset"] = int(time.time())
+                cfg["prefs"] = np
+                save_config(cfg)
+                cfg["prefs"] = get_prefs()
+            cfg["rev"] = int(cfg.get("rev", 0)) + 1     # tells the Edge to pick up the change
             save_config(cfg)
-            return self._json({"ok": True, "layout": get_layout()})
+            return self._json({"ok": True, "layout": get_layout(), "prefs": get_prefs(), "rev": cfg["rev"]})
         except Exception as e:
             return self._json({"ok": False, "error": str(e)}, 400)
 

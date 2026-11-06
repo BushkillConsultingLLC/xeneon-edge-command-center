@@ -49,11 +49,18 @@ JXA
 pkill -f "user-data-dir=$PROFILE" 2>/dev/null && sleep 1
 
 ARGS=(--app="http://127.0.0.1:8888/" --user-data-dir="$PROFILE" --no-first-run --no-default-browser-check)
-if [ -n "$EDGE" ]; then
+# Full screen unless switched off in settings
+FULL="$(/usr/bin/python3 -c 'import json,sys
+try: print("no" if json.load(open(sys.argv[1])).get("prefs",{}).get("fullscreen") is False else "yes")
+except Exception: print("yes")' "$DIR/config.json")"
+if [ -n "$EDGE" ] && [ "$FULL" = "yes" ]; then
   IFS=, read -r EX EY EW EH <<< "$EDGE"
   # Kiosk = full screen on the display the window starts on, with no title bar.
   # Quit it with Command+Q, or with Stop Command Center.
   ARGS+=(--window-position="$EX,$EY" --window-size="$EW,$EH" --kiosk)
+elif [ -n "$EDGE" ]; then
+  IFS=, read -r EX EY EW EH <<< "$EDGE"
+  ARGS+=(--window-position="$EX,$EY" --window-size="$EW,$EH")
 fi
 open -na "Google Chrome" --args "${ARGS[@]}"
 
