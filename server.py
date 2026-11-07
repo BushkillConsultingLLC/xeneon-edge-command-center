@@ -67,11 +67,15 @@ def load_contacts():
         try:
             con = sqlite3.connect("file:%s?mode=ro" % path, uri=True, timeout=2)
             names = {}
-            for pk, first, last, org in con.execute(
-                    "SELECT Z_PK, ZFIRSTNAME, ZLASTNAME, ZORGANIZATION FROM ZABCDRECORD"):
-                n = " ".join(x for x in (first, last) if x) or org
-                if n:
-                    names[pk] = n
+            cols = {r[1] for r in con.execute("PRAGMA table_info(ZABCDRECORD)")}
+            nick_col = "ZNICKNAME" if "ZNICKNAME" in cols else "NULL"
+            for pk, first, last, org, nick in con.execute(
+                    "SELECT Z_PK, ZFIRSTNAME, ZLASTNAME, ZORGANIZATION, %s FROM ZABCDRECORD" % nick_col):
+                full = " ".join(x.strip() for x in (first, last) if x and x.strip()) or (org or "").strip()
+                if full:
+                    # Messages shows a contact's nickname when the card has one; so do we
+                    names[pk] = {"full": full, "nick": (nick or "").strip(),
+                                 "first": (first or "").strip().split(" ")[0] if first else full}
             for owner, num in con.execute("SELECT ZOWNER, ZFULLNUMBER FROM ZABCDPHONENUMBER"):
                 if owner in names and num:
                     m[norm_handle(num)] = names[owner]
@@ -145,6 +149,7 @@ def recent_messages(limit=12):
         return {"ok": False, "error": "no_access", "detail": str(e)}
     con.close()
     contacts = load_contacts()
+    name_style = get_prefs().get("msgNames", "full")
     out, seen = [], set()
     for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att in rows:
         if rowid in seen:
@@ -159,7 +164,11 @@ def recent_messages(limit=12):
         # Apple stores nanoseconds since 2001-01-01 (older DBs: seconds)
         secs = date / 1e9 if date and date > 1e12 else (date or 0)
         unix = secs + 978307200
-        sender = contacts.get(norm_handle(handle), handle or "Unknown")
+        c = contacts.get(norm_handle(handle))
+        if c:
+            sender = c["nick"] or (c["first"] if name_style == "first" else c["full"])
+        else:
+            sender = handle or "Unknown"
         out.append({
             "id": rowid,
             "from": sender,
@@ -251,7 +260,8 @@ DEFAULT_LAYOUT = {
 }
 
 
-DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0}
+DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
+                 "msgNames": "full"}
 
 
 def get_prefs():
@@ -264,6 +274,8 @@ def get_prefs():
         p["speaker"] = saved["speaker"].strip()[:60]
     if "fullscreen" in saved:
         p["fullscreen"] = bool(saved["fullscreen"])
+    if saved.get("msgNames") in ("full", "first"):
+        p["msgNames"] = saved["msgNames"]
     if isinstance(saved.get("spotifyReset"), (int, float)):
         p["spotifyReset"] = int(saved["spotifyReset"])
     return p
@@ -560,7 +572,7 @@ class Handler(SimpleHTTPRequestHandler):
                 cfg["layout"] = get_layout()      # store the cleaned-up version
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
-                for k in ("spotifyClientId", "speaker", "fullscreen"):
+                for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

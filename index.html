@@ -219,6 +219,7 @@
       <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
       <hr>
     </div>
+    <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
     <hr>
@@ -305,7 +306,7 @@ async function watchConfig() {
         store.set("spReset", String(prefs.spotifyReset || 0));
         spState = null;
       }
-      applyLayout(); loadCalendars();
+      applyLayout(); loadCalendars(); loadMessages();
     } else cfgRev = c.rev;
   } catch (e) {}
 }
@@ -873,6 +874,7 @@ async function openSetup() {
   $("cid").value = prefs.spotifyClientId || "";
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
+  $("msgFirst").checked = prefs.msgNames === "first";
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
@@ -902,7 +904,7 @@ $("spotlogout").onclick = async () => {
 };
 $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
-  const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked };
+  const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full" };
   const cals = [...$("calrows").children].map(r => ({
     name: r.querySelector(".cn").value.trim() || "Calendar",
     color: r.querySelector(".cc").value,
