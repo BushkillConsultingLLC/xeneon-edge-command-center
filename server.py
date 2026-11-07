@@ -76,12 +76,20 @@ def load_contacts():
                     # Messages shows a contact's nickname when the card has one; so do we
                     names[pk] = {"full": full, "nick": (nick or "").strip(),
                                  "first": (first or "").strip().split(" ")[0] if first else full}
+            def keep(key, card):
+                # Several cards (from different accounts) can share a number or email.
+                # Prefer one with a nickname, then the shortest name, so a stray
+                # duplicate card with a long or joke name doesn't win by accident.
+                old = m.get(key)
+                rank = lambda c: (0 if c["nick"] else 1, len(c["full"]))
+                if old is None or rank(card) < rank(old):
+                    m[key] = card
             for owner, num in con.execute("SELECT ZOWNER, ZFULLNUMBER FROM ZABCDPHONENUMBER"):
                 if owner in names and num:
-                    m[norm_handle(num)] = names[owner]
+                    keep(norm_handle(num), names[owner])
             for owner, addr in con.execute("SELECT ZOWNER, ZADDRESS FROM ZABCDEMAILADDRESS"):
                 if owner in names and addr:
-                    m[norm_handle(addr)] = names[owner]
+                    keep(norm_handle(addr), names[owner])
             con.close()
         except Exception:
             continue
