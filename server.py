@@ -158,6 +158,7 @@ def recent_messages(limit=12):
     con.close()
     contacts = load_contacts()
     name_style = get_prefs().get("msgNames", "full")
+    overrides = load_config().get("nameOverrides") or {}
     out, seen = [], set()
     for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att in rows:
         if rowid in seen:
@@ -172,14 +173,19 @@ def recent_messages(limit=12):
         # Apple stores nanoseconds since 2001-01-01 (older DBs: seconds)
         secs = date / 1e9 if date and date > 1e12 else (date or 0)
         unix = secs + 978307200
-        c = contacts.get(norm_handle(handle))
-        if c:
+        key = norm_handle(handle)
+        c = contacts.get(key)
+        if overrides.get(key):
+            sender = overrides[key]
+        elif c:
             sender = c["nick"] or (c["first"] if name_style == "first" else c["full"])
         else:
             sender = handle or "Unknown"
         out.append({
             "id": rowid,
             "from": sender,
+            "key": key,
+            "card": (c["nick"] or c["full"]) if c else "",
             "group": group_name or None,
             "text": body[:400],
             "time": int(unix * 1000),
@@ -487,6 +493,18 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if p == "/api/messages":
             return self._json(recent_messages())
+        if p == "/api/senders":
+            d = recent_messages(limit=60)
+            ov = load_config().get("nameOverrides") or {}
+            seen, out = set(), []
+            for m in d.get("messages", []):
+                if m["key"] and m["key"] not in seen:
+                    seen.add(m["key"])
+                    out.append({"key": m["key"], "card": m["card"], "override": ov.get(m["key"], "")})
+            for k, v in ov.items():            # keep overrides for people who haven't texted lately
+                if k not in seen:
+                    out.append({"key": k, "card": "", "override": v})
+            return self._json({"ok": d.get("ok", False), "senders": out[:20]})
         if p == "/api/claude":
             try:
                 with open(os.path.join(ROOT, "claude-status.json")) as f:
@@ -574,6 +592,13 @@ class Handler(SimpleHTTPRequestHandler):
                         c["url"] = old[i]["url"]
                 cfg["calendars"] = [c for c in cals if c["url"] != "__keep__"]
                 _ics_cache.clear()
+            if isinstance(body.get("nameOverrides"), dict):
+                ov = {}
+                for k, v in list(body["nameOverrides"].items())[:200]:
+                    k, v = str(k)[:120], str(v or "").strip()[:60]
+                    if k and v:
+                        ov[k] = v
+                cfg["nameOverrides"] = ov
             if isinstance(body.get("layout"), dict):
                 cfg["layout"] = body["layout"]
                 save_config(cfg)

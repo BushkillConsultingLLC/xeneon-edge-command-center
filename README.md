@@ -9,7 +9,7 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 | Panel | What it shows |
 |---|---|
 | **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
-| **Messages** | Your most recent incoming iMessages and texts, with names from Contacts (a contact's nickname is used when the card has one, and there's an option for first names only). Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
+| **Messages** | Your most recent incoming iMessages and texts, with names from Contacts (a contact's nickname is used when the card has one; settings let you show first names only, or type the exact name you want for anyone, which beats contact cards and names people share from their iPhones). Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
 | **Now Playing** | **Spotify** or **Apple Music**: album art, track, progress and big touch controls. Spotify can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. Apple Music is controlled directly on the Mac, with no account setup. |
 | **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
 

@@ -145,6 +145,8 @@
   .prow { display: grid; grid-template-columns: 34px 1fr 150px 48px 48px; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 16px; }
   .prow input[type=checkbox], .chk input { width: 22px; height: 22px; accent-color: var(--green); }
   .sheet select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 10px 12px; font-size: 15px; width: 100%; }
+  .nrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
+  .nrow input { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 12px; font-size: 15px; width: 100%; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .chk { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--fg); margin: 4px 0 6px; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
@@ -219,6 +221,8 @@
       <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
       <hr>
     </div>
+    <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it)</label></div>
+    <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
     <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
@@ -865,6 +869,32 @@ function renderPanelRows() {
   });
 }
 $("musicSrc").onchange = () => { $("spotFields").style.display = $("musicSrc").value === "spotify" ? "" : "none"; };
+function maskKey(k) {   // show a phone number or email in a recognisable but tidy way
+  if (/^\d{10}$/.test(k)) return "(" + k.slice(0, 3) + ") " + k.slice(3, 6) + "-" + k.slice(6);
+  return k;
+}
+async function loadNameRows() {
+  const box = $("namerows");
+  let d;
+  try { d = await (await fetch("/api/senders")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
+  if (!d.ok && !d.senders.length) { box.textContent = "Messages isn't connected yet."; return; }
+  if (!d.senders.length) { box.textContent = "No recent messages."; return; }
+  box.className = ""; box.innerHTML = "";
+  d.senders.forEach(x => {
+    const r = document.createElement("div"); r.className = "nrow";
+    r.innerHTML = `<span>${esc(x.card || maskKey(x.key))}${x.card ? `<span class="hint" style="margin-left:8px">${esc(maskKey(x.key))}</span>` : ""}</span>
+      <input placeholder="Show as… (leave empty to use the card)" aria-label="Show ${esc(x.card || x.key)} as">`;
+    const inp = r.querySelector("input");
+    inp.value = x.override || "";
+    inp.dataset.key = x.key;
+    box.appendChild(r);
+  });
+}
+function collectOverrides() {
+  const out = {};
+  document.querySelectorAll("#namerows input[data-key]").forEach(i => { if (i.value.trim()) out[i.dataset.key] = i.value.trim(); });
+  return out;
+}
 async function openSetup() {
   draftPanels = layout.panels.map(p => Object.assign({}, p));
   renderPanelRows();
@@ -875,6 +905,7 @@ async function openSetup() {
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
   $("msgFirst").checked = prefs.msgNames === "first";
+  loadNameRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
@@ -912,7 +943,9 @@ $("save").onclick = async () => {
   })).filter(c => c.url);
   const newLayout = { panels: draftPanels, music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
-    const r = await postConfig({ calendars: cals, layout: newLayout, prefs: newPrefs });
+    const body = { calendars: cals, layout: newLayout, prefs: newPrefs };
+    if (document.querySelector("#namerows input[data-key]")) body.nameOverrides = collectOverrides();
+    const r = await postConfig(body);
     cfgRev = r.rev != null ? r.rev : cfgRev;
   } catch (e) { layout = newLayout; }
   Object.assign(prefs, newPrefs);
