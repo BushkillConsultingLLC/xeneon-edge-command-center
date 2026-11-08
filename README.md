@@ -82,7 +82,7 @@ Choose **Apple Music** under *Music* in settings. The first time the dashboard r
 
 ### Notifications
 
-Works for any app that shows a red count on its Dock icon, as long as the app is running. Tick the apps you want in settings (it shows which are installed), or type any other app's name.
+Works for any app that shows a red count on its Dock icon, as long as the app is running. The dashboard reads the badges from the Dock itself, so the first time, allow Terminal under *System Settings → Privacy & Security → Accessibility*. Tick the apps you want in settings (it shows which are installed), or type any other app's name.
 
 **Gmail:** install the open-source [Gmail app badge notification](https://chromewebstore.google.com/detail/gmail-app-badge-notificat/fbaolhbfbmniffcokakochjjeccpcpkh) extension ([source](https://github.com/aberonni/gmail-app-badge-notification): it only reads Gmail's own unread feed), then in Gmail choose *⋮ → Cast, save and share → Install page as app*. The installed Gmail app gets a Dock badge, and the dashboard counts it. **LinkedIn:** the same "install as app" trick works only if LinkedIn sets a badge, which isn't guaranteed.
 
@@ -148,6 +148,7 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | Typing on the Edge doesn't work | Expected: full-screen windows, and the touch driver, hand the keyboard back to your main screen. Use the ⚙︎, which opens settings on the main monitor. |
 | Apple Music says "Allow Terminal to control Music" | *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**. |
 | The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
+| Notification tiles all say 0 | Allow Terminal under *Privacy & Security → Accessibility*, then restart. A tile can only show what the app's Dock icon shows: if the icon has no red badge, neither will the tile. |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
 
 ## Credits and license

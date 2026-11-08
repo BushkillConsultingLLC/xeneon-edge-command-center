@@ -658,6 +658,8 @@ async function loadBadges() {
     const n = a.label || "", cls = !a.running ? "closed" : (n ? "hot" : "zero");
     return `<button class="ntile ${cls}" data-app="${esc(a.app)}"><span class="n">${a.running ? esc(n || "0") : "Not open"}</span><span class="a">${esc(SHORT_APP(a.app))}</span></button>`;
   }).join("") : `<div class="empty">Choose apps in settings.</div>`;
+  if (d.note === "dock_permission") $("ntiles").insertAdjacentHTML("beforeend",
+    `<div class="err" style="grid-column:1/-1">To read the red badges, allow Terminal: System Settings → Privacy &amp; Security → Accessibility → turn on Terminal.</div>`);
 }
 $("ntiles").addEventListener("click", ev => { const b = ev.target.closest("[data-app]"); if (b) macOpen({ kind: "app", app: b.dataset.app }, b); });
 setInterval(loadBadges, 10000);

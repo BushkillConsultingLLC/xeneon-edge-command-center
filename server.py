@@ -461,16 +461,60 @@ def badge_catalog():
                                   "known": n in KNOWN_BADGE_APPS} for n in names]}
 
 
+DOCK_SCRIPT = r'''
+set out to ""
+tell application "System Events" to tell process "Dock"
+  repeat with e in (UI elements of list 1)
+    set lbl to ""
+    try
+      set v to value of attribute "AXStatusLabel" of e
+      if v is not missing value then set lbl to v as text
+    end try
+    try
+      set out to out & (name of e) & tab & lbl & linefeed
+    end try
+  end repeat
+end tell
+return out'''
+_badge_debug = {"t": 0}
+
+
+def dock_badges():
+    """Badge labels exactly as drawn on the Dock (needs Accessibility for Terminal)."""
+    ok, out, err = osa(DOCK_SCRIPT, timeout=5)
+    if not ok:
+        return None, err
+    labels = {}
+    for line in out.splitlines():
+        if "\t" in line:
+            name, lbl = line.split("\t", 1)
+            labels[name.strip()] = lbl.strip()
+    return labels, ""
+
+
 def badges():
+    """Unread badges as drawn on the Dock. lsappinfo's StatusLabel comes back
+    empty on recent macOS, so the Dock is read directly (needs Accessibility
+    for Terminal); lsappinfo is only used to tell whether an app is running."""
+    apps = get_prefs()["badgeApps"]
+    labels, err = dock_badges()
+    note = ""
+    if labels is None:
+        note = "dock_permission" if ("-1719" in err or "-25211" in err or "assistive" in err.lower()) else "dock_error"
     out = []
-    for name in get_prefs()["badgeApps"]:
-        running = bool(_lsappinfo(["find", "name=" + name]).strip())
-        label = ""
-        if running:
-            m = re.search(r'"label"="([^"]*)"', _lsappinfo(["info", "-only", "StatusLabel", name]))
-            label = m.group(1) if m else ""
+    for name in apps:
+        running = bool(_lsappinfo(["find", "name=" + name]).strip()) or bool(labels and labels.get(name))
+        label = (labels or {}).get(name, "") if running else ""
         out.append({"app": name, "running": running, "label": label})
-    return {"ok": True, "apps": out}
+    if time.time() - _badge_debug["t"] > 30:
+        _badge_debug["t"] = time.time()
+        try:
+            with open(os.path.join(ROOT, "badge-debug.txt"), "w") as f:
+                f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + ("dock error: " + err[:300] if labels is None else "dock: " + repr(labels)[:1500])
+                        + "\nresult: " + json.dumps(out) + "\n")
+        except Exception:
+            pass
+    return {"ok": True, "apps": out, "note": note}
 
 
 # ---------------- Apple Reminders (read with AppleScript, no account needed) ----------------
