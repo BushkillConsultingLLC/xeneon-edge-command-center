@@ -149,6 +149,7 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | Apple Music says "Allow Terminal to control Music" | *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**. |
 | The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
 | Notification tiles all say 0 | Allow Terminal under *Privacy & Security → Accessibility*, then restart. A tile can only show what the app's Dock icon shows: if the icon has no red badge, neither will the tile. |
+| Mail or Gmail tile says 0 with no Dock badge | The dashboard falls back to asking Mail for its unread count (allow Terminal to control Mail when macOS asks) and to reading the count in the Gmail window title ("Inbox (3)"). |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
 
 ## Credits and license

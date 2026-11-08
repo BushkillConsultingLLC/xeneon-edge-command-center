@@ -504,6 +504,34 @@ def dock_badges():
     return labels, ""
 
 
+_unread_memo = {}
+
+
+def unread_fallback(name):
+    """When an app shows no Dock badge, ask it another way.
+    Mail: its own unread count for every inbox (asks once for Automation permission).
+    Web apps like Gmail: the count in the window title, e.g. "Inbox (3) - ... - Gmail"."""
+    if name == "Mail":
+        ok, out, _ = osa('tell application "Mail" to return unread count of inbox', timeout=4)
+        if ok and out.strip().isdigit():
+            return "" if out.strip() == "0" else out.strip()
+        return None
+    ok, out, _ = osa('tell application "System Events" to if exists process "%s" then return name of every window of process "%s"'
+                     % (name.replace('"', ''), name.replace('"', '')), timeout=3)
+    if not ok:
+        return None
+    m = re.search(r"\bInbox \((\d[\d,]*)\)", out)
+    if m:
+        _unread_memo[name] = (time.time(), m.group(1).replace(",", ""))
+        return _unread_memo[name][1]
+    if re.search(r"\bInbox\b", out):
+        _unread_memo[name] = (time.time(), "")
+        return ""
+    # Window is showing an email, not the inbox: keep the last count for a while
+    t, v = _unread_memo.get(name, (0, None))
+    return v if time.time() - t < 900 else None
+
+
 def badges():
     """Unread badges as drawn on the Dock. lsappinfo's StatusLabel comes back
     empty on recent macOS, so the Dock is read directly (needs Accessibility
@@ -517,6 +545,10 @@ def badges():
     for name in apps:
         running = bool(_lsappinfo(["find", "name=" + name]).strip()) or bool(labels and labels.get(name))
         label = (labels or {}).get(name, "") if running else ""
+        if running and not label:
+            alt = unread_fallback(name)
+            if alt:
+                label = alt
         title = (get_prefs()["tiles"].get(name) or {}).get("label") or ""
         out.append({"app": name, "running": running, "label": label, "title": title})
     if time.time() - _badge_debug["t"] > 30:
