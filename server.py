@@ -312,7 +312,7 @@ def zones_from_panels(panels):
 DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
 DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
-                 "calSource": "links", "hiddenCals": []}
+                 "calSource": "links", "hiddenCals": [], "tiles": {}}
 
 
 def get_prefs():
@@ -330,6 +330,18 @@ def get_prefs():
     if isinstance(saved.get("badgeApps"), list):
         apps = [str(a).strip()[:40] for a in saved["badgeApps"] if str(a).strip()]
         p["badgeApps"] = [a for a in apps if re.fullmatch(r"[\w .&+'()-]{1,40}", a)][:12]
+    if isinstance(saved.get("tiles"), dict):
+        tiles = {}
+        for app, t in list(saved["tiles"].items())[:20]:
+            if not isinstance(t, dict):
+                continue
+            label = str(t.get("label", "")).strip()[:30]
+            target = str(t.get("open", "")).strip()[:300]
+            if target and not (target.startswith("https://") or re.fullmatch(r"[\w .&+'()-]{1,40}", target)):
+                target = ""
+            if label or target:
+                tiles[str(app)[:40]] = {"label": label, "open": target}
+        p["tiles"] = tiles
     if saved.get("calSource") in ("links", "apple", "both"):
         p["calSource"] = saved["calSource"]
     if isinstance(saved.get("hiddenCals"), list):
@@ -505,7 +517,8 @@ def badges():
     for name in apps:
         running = bool(_lsappinfo(["find", "name=" + name]).strip()) or bool(labels and labels.get(name))
         label = (labels or {}).get(name, "") if running else ""
-        out.append({"app": name, "running": running, "label": label})
+        title = (get_prefs()["tiles"].get(name) or {}).get("label") or ""
+        out.append({"app": name, "running": running, "label": label, "title": title})
     if time.time() - _badge_debug["t"] > 30:
         _badge_debug["t"] = time.time()
         try:
@@ -792,7 +805,15 @@ class Handler(SimpleHTTPRequestHandler):
                     ok = mac_open(["-a", "Messages"])
                 elif kind == "app":
                     name = str(body.get("app", ""))
-                    ok = name in get_prefs()["badgeApps"] + ["Reminders"] and mac_open(["-a", name])
+                    prefs = get_prefs()
+                    target = (prefs["tiles"].get(name) or {}).get("open", "")
+                    if name not in prefs["badgeApps"] + ["Reminders"]:
+                        ok = False
+                    elif target.startswith("https://"):
+                        chrome = app_installed("Google Chrome")
+                        ok = mac_open((["-a", "Google Chrome"] if chrome else []) + [target])
+                    else:
+                        ok = mac_open(["-a", target or name])
                 elif kind == "settings":
                     # in your normal browser, on the main screen, where typing works
                     ok = mac_open(["http://127.0.0.1:%d/?settings" % PORT])
@@ -860,7 +881,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals"):
+                          "calSource", "hiddenCals", "tiles"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

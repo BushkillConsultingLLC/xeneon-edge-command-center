@@ -211,6 +211,8 @@
   .brow .st { font-size: 13px; color: var(--muted); }
   .brow .st.ok { color: var(--green); }
   .brow a { color: var(--blue); }
+  .bopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: -2px 0 10px 40px; }
+  .bopts input { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 7px 10px; font-size: 14px; width: 100%; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .chk { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--fg); margin: 4px 0 6px; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
@@ -656,7 +658,7 @@ async function loadBadges() {
   $("notifcount").textContent = total ? total + " unread" : "";
   $("ntiles").innerHTML = apps.length ? apps.map(a => {
     const n = a.label || "", cls = !a.running ? "closed" : (n ? "hot" : "zero");
-    return `<button class="ntile ${cls}" data-app="${esc(a.app)}"><span class="n">${a.running ? esc(n || "0") : "Not open"}</span><span class="a">${esc(SHORT_APP(a.app))}</span></button>`;
+    return `<button class="ntile ${cls}" data-app="${esc(a.app)}"><span class="n">${a.running ? esc(n || "0") : "Not open"}</span><span class="a">${esc(a.title || SHORT_APP(a.app))}</span></button>`;
   }).join("") : `<div class="empty">Choose apps in settings.</div>`;
   if (d.note === "dock_permission") $("ntiles").insertAdjacentHTML("beforeend",
     `<div class="err" style="grid-column:1/-1">To read the red badges, allow Terminal: System Settings → Privacy &amp; Security → Accessibility → turn on Terminal.</div>`);
@@ -1077,12 +1079,23 @@ async function loadBadgeRows() {
   const box = $("badgerows");
   let d; try { d = await (await fetch("/api/badges?catalog=1")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
   box.className = ""; box.innerHTML = "";
+  const tiles = prefs.tiles || {};
+  const PH = { "Mail": ["e.g. Gmail", "e.g. https://mail.google.com"], "Microsoft Outlook": ["e.g. Work email", "e.g. https://outlook.office.com"] };
   d.apps.filter(a => a.known).forEach(a => {
     const r = document.createElement("label"); r.className = "brow";
     const status = a.installed ? `<span class="st ok">Installed</span>` : `<span class="st">Not installed</span>`;
     r.innerHTML = `<input type="checkbox" data-app="${esc(a.app)}" ${a.on ? "checked" : ""}><span>${esc(SHORT_APP(a.app))}</span>
       <span class="st">${status}${BADGE_HELP[a.app] ? " · " + BADGE_HELP[a.app] : " · Counts when the app is open."}</span>`;
-    box.appendChild(r);
+    const o = document.createElement("div"); o.className = "bopts";
+    const ph = PH[a.app] || ["optional", "app name or https:// link (optional)"];
+    o.innerHTML = `<input data-tlabel="${esc(a.app)}" placeholder="Show as: ${esc(ph[0])}" aria-label="Show ${esc(SHORT_APP(a.app))} as">
+      <input data-topen="${esc(a.app)}" placeholder="Tap opens: ${esc(ph[1])}" aria-label="When ${esc(SHORT_APP(a.app))} is tapped, open" spellcheck="false">`;
+    o.querySelector("[data-tlabel]").value = (tiles[a.app] || {}).label || "";
+    o.querySelector("[data-topen]").value = (tiles[a.app] || {}).open || "";
+    const cb = r.querySelector("input");
+    o.style.display = cb.checked ? "" : "none";
+    cb.addEventListener("change", () => { o.style.display = cb.checked ? "" : "none"; });
+    box.appendChild(r); box.appendChild(o);
   });
   $("badgeApps").value = d.apps.filter(a => !a.known && a.on).map(a => a.app).join(", ");
 }
@@ -1188,6 +1201,14 @@ $("save").onclick = async () => {
     hiddenCals: document.querySelector("#applerows input[data-cal]")
       ? [...document.querySelectorAll("#applerows input[data-cal]")].filter(i => !i.checked).map(i => i.dataset.cal)
       : (prefs.hiddenCals || []),
+    tiles: document.querySelector("#badgerows [data-tlabel]") ? (() => {
+      const t = {};
+      document.querySelectorAll("#badgerows [data-tlabel]").forEach(i => {
+        const app = i.dataset.tlabel, open = document.querySelector(`#badgerows [data-topen="${CSS.escape(app)}"]`).value.trim();
+        if (i.value.trim() || open) t[app] = { label: i.value.trim(), open };
+      });
+      return t;
+    })() : (prefs.tiles || {}),
     badgeApps: document.querySelector("#badgerows input[data-app]")
       ? [...document.querySelectorAll("#badgerows input[data-app]")].filter(i => i.checked).map(i => i.dataset.app)
           .concat($("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean))
