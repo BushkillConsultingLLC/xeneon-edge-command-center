@@ -18,9 +18,9 @@
     -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
   .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
-    grid-template-columns: 1.1fr 1.1fr 1.35fr 0.8fr; }
+    grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
   .panel.off { display: none; }
-  .panel { background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
+  .panel { container-type: size; container-name: panel; background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
     display: flex; flex-direction: column; position: relative; overflow: hidden; }
   .label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600;
     display: flex; align-items: center; gap: 10px; }
@@ -77,6 +77,44 @@
   .msg.unread .who::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--blue);
     border-radius: 50%; margin-left: 8px; vertical-align: middle; }
 
+  /* ---------- notifications panel ---------- */
+  .ntiles { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); grid-auto-rows: minmax(96px, 1fr); gap: 10px; margin-top: 14px; min-height: 0; overflow: hidden; align-content: start; }
+  .ntile { background: var(--panel2); border: 0; border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; color: var(--fg); min-height: 0; }
+  .ntile .n { font-size: 40px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .ntile .a { font-size: 15px; color: var(--muted); }
+  .ntile.hot { box-shadow: inset 0 0 0 2px var(--red); }
+  .ntile.hot .n { color: var(--red); }
+  .ntile.zero .n { color: var(--dim); }
+  .ntile.closed { opacity: .45; }
+  .ntile.closed .n { font-size: 15px; font-weight: 500; color: var(--dim); }
+
+  /* ---------- compact panels (half-height zones, narrow zones) ---------- */
+  @container panel (max-height: 420px) {
+    .clock { margin-bottom: 8px; } .clock .t { font-size: 44px; } .clock .d { font-size: 16px; }
+    .next { padding: 10px 14px; margin-bottom: 8px; } .next .title { font-size: 21px; margin: 3px 0 2px; } .next .meta { font-size: 14px; }
+    .join { font-size: 17px; padding: 10px 18px; min-height: 44px; }
+    .ev { padding: 4px 0; font-size: 16px; }
+    .msgs { gap: 6px; margin-top: 10px; } .msg { padding: 8px 12px; } .msg .body { -webkit-line-clamp: 1; font-size: 15px; }
+    .track { font-size: 23px; } .artist { font-size: 16px; } .sp-body { margin-top: 8px; gap: 18px; }
+    .svc { margin-top: 10px; } .task { margin-top: 10px; padding: 12px; } .task .ttl { font-size: 18px; } .steps { display: none; }
+    .rems { margin-top: 8px; } .rem { min-height: 42px; } .rem .t { font-size: 16px; }
+    .ntiles { grid-auto-rows: minmax(64px, 1fr); margin-top: 10px; gap: 8px; } .ntile .n { font-size: 28px; } .ntile { padding: 8px 12px; }
+  }
+  @container panel (max-width: 700px) {
+    .cb { width: 48px; height: 48px; } .cb.play { width: 58px; height: 58px; } .cb.sm { width: 40px; height: 40px; }
+    .ctrls { gap: 8px; } .art { width: min(42%, calc(100cqh - 90px)); }
+  }
+  @container panel (max-width: 520px) {
+    .cb.sm { display: none; }
+  }
+
+  /* ---------- zone picker (settings) ---------- */
+  .zones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .zones label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; letter-spacing: .06em; }
+  .zprev { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 54px); gap: 6px; margin-top: 12px; background: #000; padding: 6px; border-radius: 12px; }
+  .zprev div { border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #000; }
+  .zprev .empty-z { background: var(--panel2); color: var(--dim); font-weight: 400; }
+
   /* ---------- notification badges ---------- */
   .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .badges:empty { display: none; }
@@ -100,7 +138,7 @@
 
   /* ---------- spotify ---------- */
   .sp-body { flex: 1; display: flex; align-items: center; gap: 24px; min-height: 0; margin-top: 14px; }
-  .art { width: min(50%, calc(100vh - 110px)); aspect-ratio: 1 / 1; border-radius: 14px; background: var(--panel2) center/cover no-repeat;
+  .art { width: min(50%, calc(100cqh - 90px)); aspect-ratio: 1 / 1; border-radius: 14px; background: var(--panel2) center/cover no-repeat;
     flex: none; display: flex; align-items: center; justify-content: center; font-size: 80px; color: var(--line); }
   .sp-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
   .track { font-size: 30px; font-weight: 700; line-height: 1.12; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -186,7 +224,6 @@
   <!-- MESSAGES -->
   <section class="panel" id="msgp">
     <div class="label">Messages<span class="sp"></span><span class="pill" id="msgcount"></span></div>
-    <div class="badges" id="badges"></div>
     <div class="msgs" id="msgs"><div class="empty">Loading…</div></div>
   </section>
 
@@ -212,6 +249,12 @@
     <div class="toast" id="sptoast"></div>
   </section>
 
+  <!-- NOTIFICATIONS -->
+  <section class="panel" id="notif">
+    <div class="label" id="notiflabel">Notifications<span class="sp"></span><span class="pill" id="notifcount"></span></div>
+    <div class="ntiles" id="ntiles"><div class="empty">Loading…</div></div>
+  </section>
+
   <!-- REMINDERS -->
   <section class="panel" id="remp">
     <div class="label" id="remlabel">Reminders<span class="sp"></span><span class="pill" id="remcount"></span></div>
@@ -234,8 +277,10 @@
   <div class="sheet">
     <h2>Command Center settings</h2>
     <p>These stay on this Mac. Calendar links are private: anyone with one can read that calendar, so don't share them.</p>
-    <div class="fld"><label>Panels: tick to show, size, order</label></div>
-    <div id="panelrows"></div>
+    <div class="fld"><label>Layout: pick what goes in each zone. Give a panel several zones to make it bigger (they must form a rectangle).</label></div>
+    <div class="zones" id="zonepick"></div>
+    <div class="zprev" id="zprev" aria-hidden="true"></div>
+    <div class="err" id="zerr" style="margin-top:8px"></div>
     <div class="two" style="margin-top:14px">
       <div class="fld"><label for="musicSrc">Music</label><select id="musicSrc"><option value="spotify">Spotify</option><option value="apple">Apple Music</option></select></div>
       <div class="fld"><label for="aiSrc">AI assistant status</label><select id="aiSrc"><option value="claude">Claude</option><option value="openai">ChatGPT / OpenAI</option><option value="github">GitHub Copilot</option><option value="none">None</option></select></div>
@@ -251,8 +296,7 @@
     </div>
     <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
-    <label class="chk"><input type="checkbox" id="badgesOn"> Show unread badges at the top of Messages</label>
-    <div class="fld"><label for="badgeApps">Apps to show badges for (names as in your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false"></div>
+    <div class="fld"><label for="badgeApps">Notifications panel: apps to count (names as in your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false"></div>
     <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
@@ -285,19 +329,25 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 /* =========================================================
    LAYOUT (which panels show, how wide, in what order)
    ========================================================= */
-const PANEL_EL = { calendar: "cal", messages: "msgp", music: "spot", ai: "cl", reminders: "remp" };
-const PANEL_NAME = { calendar: "Calendar", messages: "Messages", music: "Music", ai: "AI assistant", reminders: "Reminders" };
-const SIZE_FR = { s: "0.8fr", m: "1.1fr", l: "1.4fr" };
-let layout = { panels: [{ id: "calendar", on: true, size: "m" }, { id: "messages", on: true, size: "m" }, { id: "music", on: true, size: "l" }, { id: "ai", on: true, size: "s" }, { id: "reminders", on: true, size: "m" }], music: "spotify", ai: "claude", aiTask: true };
+const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders" };
+const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942" };
+let layout = { zones: ["calendar", "messages", "music", "ai", "calendar", "messages", "music", "reminders"], music: "spotify", ai: "claude", aiTask: true };
+const panelOn = id => (layout.zones || []).includes(id);
+// The rectangle of zones a panel covers, or null if it isn't placed or isn't a rectangle
+function zoneBox(zones, id) {
+  const idx = zones.map((z, i) => z === id ? i : -1).filter(i => i >= 0);
+  if (!idx.length) return null;
+  const rows = idx.map(i => Math.floor(i / 4)), cols = idx.map(i => i % 4);
+  const r0 = Math.min(...rows), r1 = Math.max(...rows), c0 = Math.min(...cols), c1 = Math.max(...cols);
+  return { r0, r1, c0, c1, ok: (r1 - r0 + 1) * (c1 - c0 + 1) === idx.length };
+}
 function applyLayout() {
-  const cols = [];
-  layout.panels.forEach((p, i) => {
-    const el = $(PANEL_EL[p.id]);
-    el.style.order = i;
-    el.classList.toggle("off", !p.on);
-    if (p.on) cols.push(SIZE_FR[p.size] || "1fr");
+  Object.keys(PANEL_EL).forEach(id => {
+    const el = $(PANEL_EL[id]), b = zoneBox(layout.zones || [], id);
+    el.classList.toggle("off", !(b && b.ok));
+    if (b && b.ok) { el.style.gridColumn = (b.c0 + 1) + " / " + (b.c1 + 2); el.style.gridRow = (b.r0 + 1) + " / " + (b.r1 + 2); }
   });
-  document.querySelector(".grid").style.gridTemplateColumns = cols.join(" ") || "1fr";
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
   loadBadges(); loadReminders(false);
   applyAi();
@@ -564,14 +614,19 @@ $("msgp").querySelector(".label").addEventListener("click", () => macOpen({ kind
 /* ---------- unread badges from the Dock ---------- */
 const SHORT_APP = n => n.replace(/^Microsoft /, "");
 async function loadBadges() {
-  if (SETTINGS_PAGE || prefs.badges === false || !layout.panels.find(p => p.id === "messages" && p.on)) { $("badges").innerHTML = ""; return; }
-  let d; try { d = await (await fetch("/api/badges")).json(); } catch (e) { return; }
-  $("badges").innerHTML = (d.apps || []).filter(a => a.running).map(a => {
-    const n = a.label || "";
-    return `<button class="bdg ${n ? "" : "zero"}" data-app="${esc(a.app)}">${esc(SHORT_APP(a.app))}<b>${esc(n || "0")}</b></button>`;
-  }).join("");
+  if (SETTINGS_PAGE || !panelOn("notifications")) return;
+  let d; try { d = await (await fetch("/api/badges")).json(); } catch (e) { $("ntiles").innerHTML = `<div class="err">Can't reach the local server.</div>`; return; }
+  const apps = d.apps || [];
+  // running apps first, busiest first; closed ones at the end, dimmed
+  apps.sort((a, b) => (b.running - a.running) || ((parseInt(b.label) || (b.label ? 1 : 0)) - (parseInt(a.label) || (a.label ? 1 : 0))));
+  const total = apps.reduce((t, a) => t + (parseInt(a.label) || 0), 0);
+  $("notifcount").textContent = total ? total + " unread" : "";
+  $("ntiles").innerHTML = apps.length ? apps.map(a => {
+    const n = a.label || "", cls = !a.running ? "closed" : (n ? "hot" : "zero");
+    return `<button class="ntile ${cls}" data-app="${esc(a.app)}"><span class="n">${a.running ? esc(n || "0") : "Not open"}</span><span class="a">${esc(SHORT_APP(a.app))}</span></button>`;
+  }).join("") : `<div class="empty">Choose apps in settings.</div>`;
 }
-$("badges").addEventListener("click", ev => { const b = ev.target.closest("[data-app]"); if (b) macOpen({ kind: "app", app: b.dataset.app }, b); });
+$("ntiles").addEventListener("click", ev => { const b = ev.target.closest("[data-app]"); if (b) macOpen({ kind: "app", app: b.dataset.app }, b); });
 setInterval(loadBadges, 10000);
 
 /* ---------- Apple Reminders ---------- */
@@ -605,7 +660,7 @@ function renderReminders(d) {
     : `<div class="empty">All done. Nothing open.</div>`;
 }
 async function loadReminders(force) {
-  if (SETTINGS_PAGE || !layout.panels.find(p => p.id === "reminders" && p.on)) return;
+  if (SETTINGS_PAGE || !panelOn("reminders")) return;
   try { renderReminders(await (await fetch("/api/reminders" + (force ? "?force=1" : ""))).json()); } catch (e) {}
 }
 $("rems").addEventListener("click", async ev => {
@@ -939,24 +994,43 @@ function calRow(c, i) {
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
-let draftPanels = [];
-function renderPanelRows() {
-  const box = $("panelrows"); box.innerHTML = "";
-  draftPanels.forEach((p, i) => {
-    const r = document.createElement("div"); r.className = "prow";
-    r.innerHTML = `<input type="checkbox" ${p.on ? "checked" : ""} aria-label="Show ${esc(PANEL_NAME[p.id])}">
-      <span>${esc(PANEL_NAME[p.id])}</span>
-      <select aria-label="Width"><option value="s">Narrow</option><option value="m">Medium</option><option value="l">Wide</option></select>
-      <button class="x" ${i === 0 ? "disabled" : ""} aria-label="Move up">↑</button>
-      <button class="x" ${i === draftPanels.length - 1 ? "disabled" : ""} aria-label="Move down">↓</button>`;
-    const [cb, , sel, up, dn] = r.children;
-    sel.value = p.size;
-    cb.onchange = () => { p.on = cb.checked; };
-    sel.onchange = () => { p.size = sel.value; };
-    up.onclick = () => { draftPanels.splice(i - 1, 0, draftPanels.splice(i, 1)[0]); renderPanelRows(); };
-    dn.onclick = () => { draftPanels.splice(i + 1, 0, draftPanels.splice(i, 1)[0]); renderPanelRows(); };
-    box.appendChild(r);
+let draftZones = [];
+function renderZonePicker() {
+  const box = $("zonepick"); box.innerHTML = "";
+  draftZones.forEach((z, i) => {
+    const d = document.createElement("div");
+    d.innerHTML = `<label for="z${i}">ZONE ${i + 1}</label><select id="z${i}"><option value="">(empty)</option>${Object.keys(PANEL_NAME).map(id => `<option value="${id}">${esc(PANEL_NAME[id])}</option>`).join("")}</select>`;
+    const sel = d.querySelector("select");
+    sel.value = z;
+    sel.onchange = () => { draftZones[i] = sel.value; renderZonePreview(); };
+    box.appendChild(d);
   });
+  renderZonePreview();
+}
+function zoneProblems() {
+  return Object.keys(PANEL_NAME).filter(id => { const b = zoneBox(draftZones, id); return b && !b.ok; });
+}
+function renderZonePreview() {
+  const pv = $("zprev"); pv.innerHTML = "";
+  const bad = zoneProblems();
+  Object.keys(PANEL_NAME).forEach(id => {
+    const b = zoneBox(draftZones, id);
+    if (!b || !b.ok) return;
+    const d = document.createElement("div");
+    d.style.gridColumn = (b.c0 + 1) + " / " + (b.c1 + 2); d.style.gridRow = (b.r0 + 1) + " / " + (b.r1 + 2);
+    d.style.background = PANEL_COLOR[id]; d.textContent = PANEL_NAME[id];
+    pv.appendChild(d);
+  });
+  draftZones.forEach((z, i) => {
+    if (z && !bad.includes(z)) return;
+    const d = document.createElement("div"); d.className = "empty-z";
+    d.style.gridColumn = (i % 4 + 1) + ""; d.style.gridRow = (Math.floor(i / 4) + 1) + "";
+    d.textContent = z ? "?" : "empty";
+    pv.appendChild(d);
+  });
+  $("zerr").textContent = bad.length ? bad.map(id => PANEL_NAME[id]).join(" and ") + (bad.length > 1 ? ": each panel's" : ":") + " zones need to form a rectangle (side by side, stacked, or a 2×2 block)." : "";
+  $("save").disabled = !!bad.length;
+  $("save").style.opacity = bad.length ? .4 : 1;
 }
 $("musicSrc").onchange = () => { $("spotFields").style.display = $("musicSrc").value === "spotify" ? "" : "none"; };
 function maskKey(k) {   // show a phone number or email in a recognisable but tidy way
@@ -986,8 +1060,9 @@ function collectOverrides() {
   return out;
 }
 async function openSetup() {
-  draftPanels = layout.panels.map(p => Object.assign({}, p));
-  renderPanelRows();
+  draftZones = (layout.zones || []).slice(0, 8);
+  while (draftZones.length < 8) draftZones.push("");
+  renderZonePicker();
   $("musicSrc").value = layout.music; $("musicSrc").onchange();
   $("aiSrc").value = layout.ai;
   $("aiTask").checked = !!layout.aiTask;
@@ -995,7 +1070,6 @@ async function openSetup() {
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
   $("msgFirst").checked = prefs.msgNames === "first";
-  $("badgesOn").checked = prefs.badges !== false;
   $("badgeApps").value = (prefs.badgeApps || []).join(", ");
   loadNameRows();
   $("savedmsg").textContent = "";
@@ -1028,13 +1102,14 @@ $("spotlogout").onclick = async () => {
 $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
   const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full",
-    badges: $("badgesOn").checked, badgeApps: $("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean) };
+    badgeApps: $("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean) };
   const cals = [...$("calrows").children].map(r => ({
     name: r.querySelector(".cn").value.trim() || "Calendar",
     color: r.querySelector(".cc").value,
     url: r.querySelector(".cu").value.trim() || (r.dataset.has ? "__keep__" : "")
   })).filter(c => c.url);
-  const newLayout = { panels: draftPanels, music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
+  if (zoneProblems().length) return;
+  const newLayout = { zones: draftZones.slice(), music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
     const body = { calendars: cals, layout: newLayout, prefs: newPrefs };
     if (document.querySelector("#namerows input[data-key]")) body.nameOverrides = collectOverrides();

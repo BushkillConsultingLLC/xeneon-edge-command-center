@@ -262,17 +262,51 @@ def open_meeting(url):
 
 
 # ---------------- layout (which panels, which services) ----------------
-PANEL_IDS = ("calendar", "messages", "music", "ai", "reminders")
+PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders")
+# The Edge is split into 8 zones: 1-4 across the top, 5-8 across the bottom.
+# A panel may take several zones as long as they form a rectangle.
 DEFAULT_LAYOUT = {
-    "panels": [{"id": "calendar", "on": True, "size": "m"},
-               {"id": "messages", "on": True, "size": "m"},
-               {"id": "music", "on": True, "size": "l"},
-               {"id": "ai", "on": True, "size": "s"},
-               {"id": "reminders", "on": True, "size": "m"}],
+    "zones": ["calendar", "messages", "music", "ai",
+              "calendar", "messages", "music", "reminders"],
     "music": "spotify",      # spotify | apple
     "ai": "claude",          # claude | openai | github | none
     "aiTask": True,          # show the "what it's working on" card
 }
+
+
+def clean_zones(zones):
+    """8 entries; each panel must fill a rectangle of zones, else it's dropped."""
+    z = [(x if x in PANEL_IDS else "") for x in (list(zones) + [""] * 8)[:8]]
+    for pid in set(x for x in z if x):
+        idx = [i for i, x in enumerate(z) if x == pid]
+        rows = [i // 4 for i in idx]
+        cols = [i % 4 for i in idx]
+        area = (max(rows) - min(rows) + 1) * (max(cols) - min(cols) + 1)
+        if area != len(idx):
+            z = [("" if x == pid else x) for x in z]
+    return z
+
+
+def zones_from_panels(panels):
+    """Older versions kept a list of panels side by side; turn that into zones."""
+    on = [p["id"] for p in panels if isinstance(p, dict) and p.get("id") in PANEL_IDS and p.get("on", True)]
+    on = list(dict.fromkeys(on))[:8]
+    if not on:
+        return list(DEFAULT_LAYOUT["zones"])
+    cols = 4
+    full = max(0, min(len(on), cols) - max(0, len(on) - cols))   # panels that get a whole column
+    top, bottom = [""] * 4, [""] * 4
+    i = 0
+    for c in range(cols):
+        if i >= len(on):
+            break
+        if c < full:
+            top[c] = bottom[c] = on[i]; i += 1
+        else:
+            top[c] = on[i]; i += 1
+            if i < len(on):
+                bottom[c] = on[i]; i += 1
+    return clean_zones(top + bottom)
 
 
 DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
@@ -305,15 +339,10 @@ def get_prefs():
 def get_layout():
     lay = load_config().get("layout") or {}
     out = json.loads(json.dumps(DEFAULT_LAYOUT))
-    panels = []
-    for p in lay.get("panels", []):
-        if isinstance(p, dict) and p.get("id") in PANEL_IDS and p["id"] not in [x["id"] for x in panels]:
-            panels.append({"id": p["id"], "on": bool(p.get("on", True)),
-                           "size": p.get("size") if p.get("size") in ("s", "m", "l") else "m"})
-    for d in DEFAULT_LAYOUT["panels"]:            # any panel missing from the saved list goes at the end
-        if d["id"] not in [x["id"] for x in panels]:
-            panels.append(dict(d))
-    out["panels"] = panels
+    if isinstance(lay.get("zones"), list):
+        out["zones"] = clean_zones(lay["zones"])
+    elif isinstance(lay.get("panels"), list):
+        out["zones"] = zones_from_panels(lay["panels"])
     if lay.get("music") in ("spotify", "apple"):
         out["music"] = lay["music"]
     if lay.get("ai") in ("claude", "openai", "github", "none"):

@@ -11,11 +11,25 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 | **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
 | **Messages** | Your most recent incoming iMessages and texts, with names from Contacts (a contact's nickname is used when the card has one; settings let you show first names only, or type the exact name you want for anyone, which beats contact cards and names people share from their iPhones). Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
 | **Now Playing** | **Spotify** or **Apple Music**: album art, track, progress and big touch controls. Spotify can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. Apple Music is controlled directly on the Mac, with no account setup. |
-| **Notifications** | A strip of unread badges at the top of Messages: the same red counts **Messages**, **Outlook**, **Mail**, **Slack**, **Teams** and other apps show on their Dock icons. No sign-ins: macOS already knows the numbers. Tap a tile to open the app. Choose which apps in settings. |
+| **Notifications** | Big tiles with the unread counts **Messages**, **Outlook**, **Mail**, **Slack**, **Teams** and other apps show on their Dock icons. No sign-ins: macOS already knows the numbers. Tap a tile to open the app. Choose which apps in settings. |
 | **Reminders** | Your open **Apple Reminders** across all lists: flagged and overdue first, then today, then upcoming. Tap the circle to check one off; it syncs to your iPhone like any other change. |
 | **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
 
-**Pick what you see.** Every panel can be turned on or off, resized (narrow, medium, wide) and reordered. Tap the ⚙︎ in the bottom-right corner of the Edge and settings open in your normal browser **on your main monitor**, where typing works properly. Save, and the Edge updates within a few seconds. (You can also open `http://127.0.0.1:8888/?settings` directly.)
+**Pick what you see.** The Edge is divided into **8 zones**, four across the top and four across the bottom:
+
+```
+ ┌───┬───┬───┬───┐
+ │ 1 │ 2 │ 3 │ 4 │
+ ├───┼───┼───┼───┤
+ │ 5 │ 6 │ 7 │ 8 │
+ └───┴───┴───┴───┘
+```
+
+Choose a panel for each zone. Give a panel several zones to make it bigger: zones 1 and 2 make a wide block, 4 and 8 a tall column, 1, 2, 5 and 6 a big square. A panel's zones must form a rectangle, and settings show a live preview and flag anything that doesn't. Every panel has a compact version for half-height zones.
+
+![Example layout: Now Playing across zones 1-2, Calendar in 3, Messages down 4 and 8, then Notifications, Reminders and Claude](docs/layout-example.png)
+
+ Tap the ⚙︎ in the bottom-right corner of the Edge and settings open in your normal browser **on your main monitor**, where typing works properly. Save, and the Edge updates within a few seconds. (You can also open `http://127.0.0.1:8888/?settings` directly.)
 
 Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, and nothing is sent anywhere except the services you connect (Spotify, your calendar feeds, Claude's public status page).
 
@@ -64,7 +78,7 @@ The dashboard uses Spotify's PKCE sign-in, so no client secret is needed. Tokens
 
 Choose **Apple Music** under *Music* in settings. The first time the dashboard reads the Music app, macOS asks whether Terminal may control Music. Click **OK**. (Missed it? *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**.)
 
-### Notifications (unread badges)
+### Notifications
 
 Works for any app that shows a red count on its Dock icon, as long as the app is running. List the apps you want in settings, using their names from the Applications folder (for example `Microsoft Outlook`). Web apps such as Gmail or LinkedIn only count if you install them as their own app (in Chrome: *⋮ → Cast, save and share → Install page as app*) **and** the site sets a badge, which varies by site.
 
