@@ -8,7 +8,7 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 
 | Panel | What it shows |
 |---|---|
-| **Calendar** | Clock, today's agenda across any number of calendars (Google, Outlook, iCloud, anything with an ICS link), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
+| **Calendar** | Clock, today's agenda from **Apple Calendar** (every calendar your Mac knows: iCloud, Google including calendars shared with you, Outlook/Exchange) and/or any number of calendar links (ICS), and a big "Next up / Now" card with a live countdown. Tap an event to open that day in Google Calendar, Outlook or Apple Calendar on your main screen. A **Join** button appears 15 minutes before any meeting with a Zoom, Teams, Meet or Webex link. |
 | **Messages** | Your most recent incoming iMessages and texts, with names from Contacts (a contact's nickname is used when the card has one; settings let you show first names only, or type the exact name you want for anyone, which beats contact cards and names people share from their iPhones). Unread ones are marked, deleted ones drop off, and tapping one opens that conversation in Messages. |
 | **Now Playing** | **Spotify** or **Apple Music**: album art, track, progress and big touch controls. Spotify can send playback to a chosen speaker (a Google Cast or Spotify Connect device) and keep it there. Apple Music is controlled directly on the Mac, with no account setup. |
 | **Notifications** | Big tiles with the unread counts **Messages**, **Outlook**, **Mail**, **Slack**, **Teams** and other apps show on their Dock icons. No sign-ins: macOS already knows the numbers. Tap a tile to open the app. Choose which apps in settings. |
@@ -56,7 +56,9 @@ macOS ignores the Edge's touch panel unless a driver is installed. Double-click 
 
 ### Calendars
 
-Each calendar needs its private ICS link. Paste it into the settings sheet, and add as many rows as you like.
+**Easiest: Apple Calendar.** In settings, set *Calendar source* to **Apple Calendar on this Mac**. Every calendar your Mac's Calendar app shows comes through, including calendars other people share with you in Google (pick which ones sync at [calendar.google.com/calendar/syncselect](https://calendar.google.com/calendar/syncselect)) and work Exchange/Outlook calendars. Add accounts in *System Settings → Internet Accounts*, then untick any calendars you don't want on the Edge. The first time, *Start Command Center* builds a tiny helper (`cal-helper.swift`, using Apple's EventKit) and macOS asks for calendar access: click **Allow**. Tapping an event opens that day in Apple Calendar.
+
+**Or: calendar links.** Each calendar needs its private ICS link. Paste it into the settings sheet, and add as many rows as you like.
 
 - **Google Calendar:** on a computer, open Google Calendar → hover the calendar → **⋮ → Settings and sharing** → **Integrate calendar** → copy **Secret address in iCal format**. Google only shows this to a calendar's owner.
 - **Outlook / Microsoft 365:** Outlook on the web → **Settings → Calendar → Shared calendars → Publish a calendar** → choose *Can view all details* → copy the **ICS** link. Some work accounts disable publishing.
@@ -80,7 +82,9 @@ Choose **Apple Music** under *Music* in settings. The first time the dashboard r
 
 ### Notifications
 
-Works for any app that shows a red count on its Dock icon, as long as the app is running. List the apps you want in settings, using their names from the Applications folder (for example `Microsoft Outlook`). Web apps such as Gmail or LinkedIn only count if you install them as their own app (in Chrome: *⋮ → Cast, save and share → Install page as app*) **and** the site sets a badge, which varies by site.
+Works for any app that shows a red count on its Dock icon, as long as the app is running. Tick the apps you want in settings (it shows which are installed), or type any other app's name.
+
+**Gmail:** install the open-source [Gmail app badge notification](https://chromewebstore.google.com/detail/gmail-app-badge-notificat/fbaolhbfbmniffcokakochjjeccpcpkh) extension ([source](https://github.com/aberonni/gmail-app-badge-notification): it only reads Gmail's own unread feed), then in Gmail choose *⋮ → Cast, save and share → Install page as app*. The installed Gmail app gets a Dock badge, and the dashboard counts it. **LinkedIn:** the same "install as app" trick works only if LinkedIn sets a badge, which isn't guaranteed.
 
 ### Reminders
 

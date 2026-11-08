@@ -206,6 +206,11 @@
   .sheet select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 10px 12px; font-size: 15px; width: 100%; }
   .nrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
   .nrow input { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 12px; font-size: 15px; width: 100%; }
+  .brow { display: grid; grid-template-columns: 30px 190px 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
+  .brow input { width: 22px; height: 22px; accent-color: var(--green); }
+  .brow .st { font-size: 13px; color: var(--muted); }
+  .brow .st.ok { color: var(--green); }
+  .brow a { color: var(--blue); }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .chk { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--fg); margin: 4px 0 6px; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
@@ -296,14 +301,22 @@
     </div>
     <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
-    <div class="fld"><label for="badgeApps">Notifications panel: apps to count (names as in your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false"></div>
+    <div class="fld"><label>Notifications panel: apps to count</label></div>
+    <div id="badgerows" class="hint">Loading…</div>
+    <div class="fld" style="margin-top:8px"><label for="badgeApps">Other apps (exact name from your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false" placeholder="e.g. Zoom, Spark"></div>
     <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
     <hr>
+    <div class="fld"><label for="calSource">Calendar source</label>
+      <select id="calSource"><option value="links">Calendar links (ICS)</option><option value="apple">Apple Calendar on this Mac</option><option value="both">Both</option></select>
+      <div class="hint">Apple Calendar shows every calendar your Mac knows: iCloud, Google (including calendars shared with you), Outlook/Exchange. Add accounts in System Settings → Internet Accounts.</div></div>
+    <div id="appleCals" style="display:none"><div class="fld"><label>Apple calendars to show</label></div><div id="applerows" class="hint">Loading…</div></div>
+    <div id="icsWrap">
     <div class="fld"><label>Calendars (private iCal / ICS links)</label></div>
     <div id="calrows"></div>
     <button class="ghost" id="addcal">+ Add calendar</button>
+    </div>
     <div class="actions">
       <span class="saved" id="savedmsg"></span>
       <button class="ghost" id="spotlogout">Disconnect Spotify</button>
@@ -372,6 +385,7 @@ async function loadLayout() {
     store.set("spReset", store.get("spReset", String(prefs.spotifyReset || 0)));
   } catch (e) {}
   applyLayout();
+  if (!SETTINGS_PAGE) loadCalendars();   // now that we know which calendar source to use
 }
 async function postConfig(body) {
   const r = await (await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
@@ -481,13 +495,32 @@ async function macOpen(body, el) {
 }
 function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
+async function loadAppleEvents(failed) {
+  let d;
+  try { d = await (await fetch("/api/apple-cal")).json(); } catch (e) { failed.push("Apple Calendar"); return []; }
+  if (!d.ok) {
+    failed.push(d.error === "permission" ? "Apple Calendar (allow access: System Settings → Privacy & Security → Calendars → Terminal)"
+      : d.error === "not_built" ? "Apple Calendar (run Start Command Center once to set it up)" : "Apple Calendar");
+    return [];
+  }
+  const cals = {}; d.calendars.forEach(c => { cals[c.id] = c; });
+  return d.events.map(e => {
+    const c = cals[e.cal] || {};
+    const start = new Date(e.start), end = new Date(e.end);
+    return { title: e.title || "(No title)", start, end, allDay: !!e.allDay, loc: e.loc || "",
+             color: c.color || "#6aa8ff", cal: c.title || "Calendar", calIdx: "apple",
+             join: findMeetingUrl([e.loc, e.url, e.notes].join(" ")) };
+  });
+}
 async function loadCalendars() {
+  const src = prefs.calSource || "links";
   try {
     const cfg = await (await fetch("/api/config")).json();
-    calendars = cfg.calendars.map((c, i) => ({ name: c.name, color: c.color || PALETTE[i % PALETTE.length], idx: i }));
+    calendars = src === "apple" ? [] : cfg.calendars.map((c, i) => ({ name: c.name, color: c.color || PALETTE[i % PALETTE.length], idx: i }));
   } catch (e) { calError = "Can't reach the local server."; renderCal(); return; }
-  if (!calendars.length) { calError = ""; events = []; renderCal(); return; }
   const all = [], failed = [];
+  if (src !== "links") all.push(...await loadAppleEvents(failed));
+  if (!calendars.length && src === "links") { calError = ""; events = []; renderCal(); return; }
   await Promise.all(calendars.map(async (cal, i) => {
     try {
       const r = await fetch("/api/ics?i=" + i);
@@ -537,7 +570,7 @@ function renderCal() {
   }
   $("next").innerHTML = nh;
 
-  if (!calendars.length) {
+  if (!calendars.length && (prefs.calSource || "links") === "links") {
     $("agenda").innerHTML = `<div class="empty">No calendars yet.<br><button class="ghost" style="margin-top:12px" onclick="document.getElementById('gear').click()">Add your calendars</button></div>`;
     return;
   }
@@ -571,7 +604,7 @@ $("cal").addEventListener("click", ev => {
   const e = events[+b.dataset.ev];
   if (e) macOpen({ kind: "calendar", cal: e.calIdx, date: ymd(e.start) }, b);
 });
-loadCalendars(); setInterval(loadCalendars, 5 * 60000); setInterval(renderCal, 30000);
+setInterval(loadCalendars, 5 * 60000);   // first load happens once settings arrive setInterval(renderCal, 30000);
 
 /* =========================================================
    MESSAGES
@@ -1032,6 +1065,52 @@ function renderZonePreview() {
   $("save").disabled = !!bad.length;
   $("save").style.opacity = bad.length ? .4 : 1;
 }
+const BADGE_HELP = {
+  "Gmail": `Needs Gmail installed as a Chrome app plus the badge extension. <a href="https://chromewebstore.google.com/detail/gmail-app-badge-notificat/fbaolhbfbmniffcokakochjjeccpcpkh" target="_blank" rel="noopener">Get the extension</a>, then in Gmail: ⋮ → Cast, save and share → Install page as app.`,
+  "LinkedIn": `Install linkedin.com as a Chrome app (⋮ → Cast, save and share → Install page as app). Only works if LinkedIn puts a count on the icon; not guaranteed.`,
+  "Mail": `Counts unread mail for every account in Apple Mail.`,
+  "Messages": `Unread texts and iMessages.`,
+};
+async function loadBadgeRows() {
+  const box = $("badgerows");
+  let d; try { d = await (await fetch("/api/badges?catalog=1")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
+  box.className = ""; box.innerHTML = "";
+  d.apps.filter(a => a.known).forEach(a => {
+    const r = document.createElement("label"); r.className = "brow";
+    const status = a.installed ? `<span class="st ok">Installed</span>` : `<span class="st">Not installed</span>`;
+    r.innerHTML = `<input type="checkbox" data-app="${esc(a.app)}" ${a.on ? "checked" : ""}><span>${esc(SHORT_APP(a.app))}</span>
+      <span class="st">${status}${BADGE_HELP[a.app] ? " · " + BADGE_HELP[a.app] : " · Counts when the app is open."}</span>`;
+    box.appendChild(r);
+  });
+  $("badgeApps").value = d.apps.filter(a => !a.known && a.on).map(a => a.app).join(", ");
+}
+async function loadAppleRows() {
+  const box = $("applerows");
+  let d; try { d = await (await fetch("/api/apple-cal?all=1")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
+  if (!d.ok) {
+    box.textContent = d.error === "permission" ? "Allow access first: System Settings → Privacy & Security → Calendars → turn on Terminal, then restart the dashboard."
+      : d.error === "not_built" ? "Run Start Command Center once to set up Apple Calendar access." : "Couldn't read Apple Calendar.";
+    return;
+  }
+  const hidden = new Set(prefs.hiddenCals || []);
+  const byAcct = {};
+  d.calendars.forEach(c => { (byAcct[c.account || "Other"] = byAcct[c.account || "Other"] || []).push(c); });
+  box.className = ""; box.innerHTML = "";
+  Object.keys(byAcct).sort().forEach(acct => {
+    const h = document.createElement("div"); h.className = "hint"; h.style.margin = "8px 0 4px"; h.textContent = acct; box.appendChild(h);
+    byAcct[acct].forEach(c => {
+      const l = document.createElement("label"); l.className = "chk";
+      l.innerHTML = `<input type="checkbox" data-cal="${esc(c.id)}" ${hidden.has(c.id) ? "" : "checked"}><span style="width:12px;height:12px;border-radius:50%;background:${esc(c.color || "#888")};display:inline-block"></span> ${esc(c.title)}`;
+      box.appendChild(l);
+    });
+  });
+}
+$("calSource").onchange = () => {
+  const v = $("calSource").value;
+  $("appleCals").style.display = v === "links" ? "none" : "";
+  $("icsWrap").style.display = v === "apple" ? "none" : "";
+  if (v !== "links") loadAppleRows();
+};
 $("musicSrc").onchange = () => { $("spotFields").style.display = $("musicSrc").value === "spotify" ? "" : "none"; };
 function maskKey(k) {   // show a phone number or email in a recognisable but tidy way
   if (/^\d{10}$/.test(k)) return "(" + k.slice(0, 3) + ") " + k.slice(3, 6) + "-" + k.slice(6);
@@ -1070,7 +1149,8 @@ async function openSetup() {
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
   $("msgFirst").checked = prefs.msgNames === "first";
-  $("badgeApps").value = (prefs.badgeApps || []).join(", ");
+  $("calSource").value = prefs.calSource || "links"; $("calSource").onchange();
+  loadBadgeRows();
   loadNameRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
@@ -1102,7 +1182,14 @@ $("spotlogout").onclick = async () => {
 $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
   const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full",
-    badgeApps: $("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean) };
+    calSource: $("calSource").value,
+    hiddenCals: document.querySelector("#applerows input[data-cal]")
+      ? [...document.querySelectorAll("#applerows input[data-cal]")].filter(i => !i.checked).map(i => i.dataset.cal)
+      : (prefs.hiddenCals || []),
+    badgeApps: document.querySelector("#badgerows input[data-app]")
+      ? [...document.querySelectorAll("#badgerows input[data-app]")].filter(i => i.checked).map(i => i.dataset.app)
+          .concat($("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean))
+      : (prefs.badgeApps || []) };
   const cals = [...$("calrows").children].map(r => ({
     name: r.querySelector(".cn").value.trim() || "Calendar",
     color: r.querySelector(".cc").value,

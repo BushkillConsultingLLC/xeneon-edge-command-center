@@ -4,6 +4,19 @@ cd "$(dirname "$0")"
 DIR="$(pwd)"
 PROFILE="$HOME/Library/Application Support/CommandCenterChrome"
 
+# Build the Apple Calendar helper the first time (or after an update)
+if [ -f "$DIR/cal-helper.swift" ] && { [ ! -x "$DIR/cal-helper" ] || [ "$DIR/cal-helper.swift" -nt "$DIR/cal-helper" ]; }; then
+  echo "Setting up Apple Calendar access (first time only, about 30 seconds)..."
+  if xcrun swiftc -O "$DIR/cal-helper.swift" -o "$DIR/cal-helper" \
+       -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$DIR/cal-helper-Info.plist" \
+       > "$HOME/Library/Logs/CommandCenter-build.log" 2>&1; then
+    echo "Done."
+    pkill -f "$DIR/server.py" 2>/dev/null && sleep 0.5   # restart the server so it sees the helper
+  else
+    echo "Couldn't build it (details: ~/Library/Logs/CommandCenter-build.log). Calendar links still work."
+  fi
+fi
+
 if ! curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health; then
   nohup /usr/bin/python3 "$DIR/server.py" > "$HOME/Library/Logs/CommandCenter.log" 2>&1 &
   disown

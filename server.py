@@ -311,7 +311,8 @@ def zones_from_panels(panels):
 
 DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
 DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
-                 "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS}
+                 "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
+                 "calSource": "links", "hiddenCals": []}
 
 
 def get_prefs():
@@ -329,6 +330,10 @@ def get_prefs():
     if isinstance(saved.get("badgeApps"), list):
         apps = [str(a).strip()[:40] for a in saved["badgeApps"] if str(a).strip()]
         p["badgeApps"] = [a for a in apps if re.fullmatch(r"[\w .&+'()-]{1,40}", a)][:12]
+    if saved.get("calSource") in ("links", "apple", "both"):
+        p["calSource"] = saved["calSource"]
+    if isinstance(saved.get("hiddenCals"), list):
+        p["hiddenCals"] = [str(x)[:200] for x in saved["hiddenCals"]][:200]
     if saved.get("msgNames") in ("full", "first"):
         p["msgNames"] = saved["msgNames"]
     if isinstance(saved.get("spotifyReset"), (int, float)):
@@ -438,6 +443,24 @@ def _lsappinfo(args):
         return ""
 
 
+KNOWN_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn",
+                    "WhatsApp", "Discord", "Telegram", "Signal"]
+APP_DIRS = ["/Applications", "/System/Applications", os.path.join(HOME, "Applications"),
+            os.path.join(HOME, "Applications", "Chrome Apps.localized")]
+
+
+def app_installed(name):
+    return any(os.path.exists(os.path.join(d, name + ".app")) for d in APP_DIRS)
+
+
+def badge_catalog():
+    """For settings: known apps plus any custom ones, with installed/selected flags."""
+    chosen = get_prefs()["badgeApps"]
+    names = KNOWN_BADGE_APPS + [a for a in chosen if a not in KNOWN_BADGE_APPS]
+    return {"ok": True, "apps": [{"app": n, "installed": app_installed(n), "on": n in chosen,
+                                  "known": n in KNOWN_BADGE_APPS} for n in names]}
+
+
 def badges():
     out = []
     for name in get_prefs()["badgeApps"]:
@@ -508,6 +531,55 @@ def complete_reminder(rid):
     ok, _, _ = osa('tell application "Reminders" to set completed of (first reminder whose id is "%s") to true' % rid, timeout=10)
     _rem_cache["t"] = 0
     return ok
+
+
+# ---------------- Apple Calendar (every calendar the Mac knows, via EventKit) ----------------
+CAL_HELPER = os.path.join(ROOT, "cal-helper")
+_apple_cache = {"t": 0, "data": None}
+
+
+def apple_calendar(force=False, include_hidden=False):
+    if not force and _apple_cache["data"] and time.time() - _apple_cache["t"] < 60:
+        data = _apple_cache["data"]
+    else:
+        if not os.path.exists(CAL_HELPER):
+            return {"ok": False, "error": "not_built"}
+        try:
+            # 130 s: the first run waits for you to answer the macOS permission prompt
+            r = subprocess.run([CAL_HELPER, "2"], capture_output=True, text=True, timeout=130)
+            data = json.loads(r.stdout or "{}")
+            if "ok" not in data:
+                data = {"ok": False, "error": "helper", "detail": (r.stderr or "")[:200]}
+        except Exception as e:
+            data = {"ok": False, "error": "helper", "detail": str(e)[:200]}
+        if data.get("ok"):
+            _apple_cache.update(t=time.time(), data=data)
+    if not data.get("ok") or include_hidden:
+        return data
+    hidden = set(get_prefs()["hiddenCals"])
+    return {"ok": True,
+            "calendars": [c for c in data["calendars"] if c["id"] not in hidden],
+            "events": [e for e in data["events"] if e["cal"] not in hidden]}
+
+
+def open_apple_calendar_day(ymd):
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", ymd or "")
+    if not m:
+        return mac_open(["-a", "Calendar"])
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    script = """
+tell application "Calendar"
+  activate
+  switch view to day view
+  set d to current date
+  set day of d to 1
+  set year of d to %d
+  set month of d to %d
+  set day of d to %d
+  view calendar at d
+end tell""" % (y, mo, d)
+    ok, _, _ = osa(script, timeout=8)
+    return ok or mac_open(["-a", "Calendar"])
 
 
 # ---------------- calendars ----------------
@@ -610,7 +682,12 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if p == "/api/messages":
             return self._json(recent_messages())
+        if p == "/api/apple-cal":
+            q = parse_qs(u.query)
+            return self._json(apple_calendar(force=q.get("force") == ["1"], include_hidden=q.get("all") == ["1"]))
         if p == "/api/badges":
+            if parse_qs(u.query).get("catalog") == ["1"]:
+                return self._json(badge_catalog())
             return self._json(badges())
         if p == "/api/reminders":
             return self._json(reminders(force=parse_qs(u.query).get("force") == ["1"]))
@@ -661,6 +738,8 @@ class Handler(SimpleHTTPRequestHandler):
                 kind = body.get("kind")
                 if kind == "message":
                     ok = open_message(body.get("id", 0))
+                elif kind == "calendar" and body.get("cal") == "apple":
+                    ok = open_apple_calendar_day(str(body.get("date", "")))
                 elif kind == "calendar":
                     ok = open_calendar_day(int(body.get("cal", -1)), str(body.get("date", "")))
                 elif kind == "meeting":
@@ -736,7 +815,8 @@ class Handler(SimpleHTTPRequestHandler):
                 cfg["layout"] = get_layout()      # store the cleaned-up version
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
-                for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps"):
+                for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
+                          "calSource", "hiddenCals"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):
