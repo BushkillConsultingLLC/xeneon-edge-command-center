@@ -516,10 +516,17 @@ def unread_fallback(name):
         if ok and out.strip().isdigit():
             return "" if out.strip() == "0" else out.strip()
         return None
-    ok, out, _ = osa('tell application "System Events" to if exists process "%s" then return name of every window of process "%s"'
-                     % (name.replace('"', ''), name.replace('"', '')), timeout=3)
-    if not ok:
-        return None
+    procs = [name] + (["Google Chrome"] if name == "Gmail" else [])
+    out = ""
+    for proc in procs:
+        proc = proc.replace('"', '')
+        ok, o, _ = osa('tell application "System Events" to if exists process "%s" then return name of every window of process "%s"'
+                       % (proc, proc), timeout=3)
+        if ok:
+            out += "\n" + o
+    if name == "Gmail":
+        # only personal Gmail windows ("Inbox (3) - you@gmail.com - Gmail"), not Workspace accounts
+        out = "\n".join(re.findall(r"Inbox[^,\n]*?@(?:gmail|googlemail)\.com", out))
     m = re.search(r"\bInbox \((\d[\d,]*)\)", out)
     if m:
         _unread_memo[name] = (time.time(), m.group(1).replace(",", ""))
