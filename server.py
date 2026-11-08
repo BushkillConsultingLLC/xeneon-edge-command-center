@@ -262,20 +262,22 @@ def open_meeting(url):
 
 
 # ---------------- layout (which panels, which services) ----------------
-PANEL_IDS = ("calendar", "messages", "music", "ai")
+PANEL_IDS = ("calendar", "messages", "music", "ai", "reminders")
 DEFAULT_LAYOUT = {
     "panels": [{"id": "calendar", "on": True, "size": "m"},
                {"id": "messages", "on": True, "size": "m"},
                {"id": "music", "on": True, "size": "l"},
-               {"id": "ai", "on": True, "size": "s"}],
+               {"id": "ai", "on": True, "size": "s"},
+               {"id": "reminders", "on": True, "size": "m"}],
     "music": "spotify",      # spotify | apple
     "ai": "claude",          # claude | openai | github | none
     "aiTask": True,          # show the "what it's working on" card
 }
 
 
+DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
 DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
-                 "msgNames": "full"}
+                 "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS}
 
 
 def get_prefs():
@@ -288,6 +290,11 @@ def get_prefs():
         p["speaker"] = saved["speaker"].strip()[:60]
     if "fullscreen" in saved:
         p["fullscreen"] = bool(saved["fullscreen"])
+    if "badges" in saved:
+        p["badges"] = bool(saved["badges"])
+    if isinstance(saved.get("badgeApps"), list):
+        apps = [str(a).strip()[:40] for a in saved["badgeApps"] if str(a).strip()]
+        p["badgeApps"] = [a for a in apps if re.fullmatch(r"[\w .&+'()-]{1,40}", a)][:12]
     if saved.get("msgNames") in ("full", "first"):
         p["msgNames"] = saved["msgNames"]
     if isinstance(saved.get("spotifyReset"), (int, float)):
@@ -393,6 +400,87 @@ def music_control(action):
     return ok
 
 
+# ---------------- Dock badges (unread counts apps show on their icons) ----------------
+def _lsappinfo(args):
+    try:
+        r = subprocess.run(["/usr/bin/lsappinfo"] + args, capture_output=True, text=True, timeout=3)
+        return r.stdout
+    except Exception:
+        return ""
+
+
+def badges():
+    out = []
+    for name in get_prefs()["badgeApps"]:
+        running = bool(_lsappinfo(["find", "name=" + name]).strip())
+        label = ""
+        if running:
+            m = re.search(r'"label"="([^"]*)"', _lsappinfo(["info", "-only", "StatusLabel", name]))
+            label = m.group(1) if m else ""
+        out.append({"app": name, "running": running, "label": label})
+    return {"ok": True, "apps": out}
+
+
+# ---------------- Apple Reminders (read with AppleScript, no account needed) ----------------
+_rem_cache = {"t": 0, "data": None}
+REM_SCRIPT = r'''
+set out to ""
+tell application "Reminders"
+  repeat with L in lists
+    set lname to name of L
+    set rs to (reminders of L whose completed is false)
+    repeat with r in rs
+      set d to ""
+      set allday to "0"
+      try
+        set dd to due date of r
+        if dd is not missing value then set d to (dd as «class isot» as string)
+        try
+          if (allday due date of r) is not missing value then set allday to "1"
+        end try
+      end try
+      set nm to name of r
+      set out to out & (id of r) & tab & lname & tab & d & tab & allday & tab & (priority of r) & tab & nm & linefeed
+    end repeat
+  end repeat
+end tell
+return out'''
+
+
+def reminders(force=False):
+    if not force and _rem_cache["data"] and time.time() - _rem_cache["t"] < 30:
+        return _rem_cache["data"]
+    running = bool(_lsappinfo(["find", "name=Reminders"]).strip())
+    if not running:
+        # start it hidden in the background so no window pops up
+        mac_open(["-g", "-j", "-a", "Reminders"])
+        time.sleep(2)
+    ok, out, err = osa(REM_SCRIPT, timeout=20)
+    if not ok:
+        data = {"ok": False, "error": "permission" if ("-1743" in err or "-1728" in err or "not allowed" in err.lower()) else "script",
+                "detail": err[:200]}
+    else:
+        items = []
+        for line in out.splitlines():
+            parts = line.split("\t")
+            if len(parts) < 6:
+                continue
+            rid, lst, due, allday, prio, name = parts[0], parts[1], parts[2], parts[3], parts[4], "\t".join(parts[5:])
+            items.append({"id": rid, "list": lst, "due": due, "allDay": allday == "1",
+                          "priority": int(prio) if prio.isdigit() else 0, "title": name.strip()})
+        data = {"ok": True, "items": items}
+    _rem_cache.update(t=time.time(), data=data)
+    return data
+
+
+def complete_reminder(rid):
+    if not re.fullmatch(r"x-apple-reminder://[A-Za-z0-9-]{8,80}", rid or ""):
+        return False
+    ok, _, _ = osa('tell application "Reminders" to set completed of (first reminder whose id is "%s") to true' % rid, timeout=10)
+    _rem_cache["t"] = 0
+    return ok
+
+
 # ---------------- calendars ----------------
 def fetch_ics(index):
     cfg = load_config()
@@ -493,6 +581,10 @@ class Handler(SimpleHTTPRequestHandler):
             return
         if p == "/api/messages":
             return self._json(recent_messages())
+        if p == "/api/badges":
+            return self._json(badges())
+        if p == "/api/reminders":
+            return self._json(reminders(force=parse_qs(u.query).get("force") == ["1"]))
         if p == "/api/senders":
             d = recent_messages(limit=60)
             ov = load_config().get("nameOverrides") or {}
@@ -546,6 +638,9 @@ class Handler(SimpleHTTPRequestHandler):
                     ok = open_meeting(str(body.get("url", "")))
                 elif kind == "messages-app":
                     ok = mac_open(["-a", "Messages"])
+                elif kind == "app":
+                    name = str(body.get("app", ""))
+                    ok = name in get_prefs()["badgeApps"] + ["Reminders"] and mac_open(["-a", name])
                 elif kind == "settings":
                     # in your normal browser, on the main screen, where typing works
                     ok = mac_open(["http://127.0.0.1:%d/?settings" % PORT])
@@ -560,6 +655,13 @@ class Handler(SimpleHTTPRequestHandler):
                 else:
                     ok = False
                 return self._json({"ok": bool(ok)})
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)}, 400)
+        if p == "/api/reminders":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(min(n, 2000)) or b"{}")
+                return self._json({"ok": complete_reminder(str(body.get("id", "")))})
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 400)
         if p == "/api/music":
@@ -605,7 +707,7 @@ class Handler(SimpleHTTPRequestHandler):
                 cfg["layout"] = get_layout()      # store the cleaned-up version
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
-                for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames"):
+                for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

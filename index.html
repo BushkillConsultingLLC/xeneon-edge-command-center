@@ -77,6 +77,27 @@
   .msg.unread .who::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--blue);
     border-radius: 50%; margin-left: 8px; vertical-align: middle; }
 
+  /* ---------- notification badges ---------- */
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .badges:empty { display: none; }
+  .bdg { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 0; border-radius: 12px; padding: 8px 12px; min-height: 44px; font-size: 15px; color: var(--fg); }
+  .bdg b { min-width: 24px; height: 24px; padding: 0 7px; border-radius: 99px; background: var(--red); color: #fff; font-size: 13px; display: inline-flex; align-items: center; justify-content: center; }
+  .bdg.zero b { background: var(--line); color: var(--muted); }
+  .bdg.closed { color: var(--dim); }
+  .bdg.closed b { display: none; }
+
+  /* ---------- reminders ---------- */
+  .rems { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
+  .rem { display: grid; grid-template-columns: 44px 1fr; align-items: center; gap: 6px; min-height: 48px; }
+  .rem .ck { width: 44px; height: 44px; border: 0; background: none; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .rem .ck i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--dim); display: block; }
+  .rem .ck:active i, .rem.done .ck i { background: var(--green); border-color: var(--green); }
+  .rem.done .t { text-decoration: line-through; color: var(--dim); }
+  .rem .t { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rem .m { font-size: 13px; color: var(--muted); }
+  .rem .m.over { color: var(--red); } .rem .m.today { color: var(--amber); }
+  .rem .bang { color: var(--amber); font-weight: 700; margin-right: 4px; }
+
   /* ---------- spotify ---------- */
   .sp-body { flex: 1; display: flex; align-items: center; gap: 24px; min-height: 0; margin-top: 14px; }
   .art { width: min(50%, calc(100vh - 110px)); aspect-ratio: 1 / 1; border-radius: 14px; background: var(--panel2) center/cover no-repeat;
@@ -165,6 +186,7 @@
   <!-- MESSAGES -->
   <section class="panel" id="msgp">
     <div class="label">Messages<span class="sp"></span><span class="pill" id="msgcount"></span></div>
+    <div class="badges" id="badges"></div>
     <div class="msgs" id="msgs"><div class="empty">Loading…</div></div>
   </section>
 
@@ -188,6 +210,12 @@
       </div>
     </div>
     <div class="toast" id="sptoast"></div>
+  </section>
+
+  <!-- REMINDERS -->
+  <section class="panel" id="remp">
+    <div class="label" id="remlabel">Reminders<span class="sp"></span><span class="pill" id="remcount"></span></div>
+    <div class="rems" id="rems"><div class="empty">Loading…</div></div>
   </section>
 
   <!-- CLAUDE -->
@@ -223,6 +251,8 @@
     </div>
     <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
+    <label class="chk"><input type="checkbox" id="badgesOn"> Show unread badges at the top of Messages</label>
+    <div class="fld"><label for="badgeApps">Apps to show badges for (names as in your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false"></div>
     <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
@@ -255,10 +285,10 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 /* =========================================================
    LAYOUT (which panels show, how wide, in what order)
    ========================================================= */
-const PANEL_EL = { calendar: "cal", messages: "msgp", music: "spot", ai: "cl" };
-const PANEL_NAME = { calendar: "Calendar", messages: "Messages", music: "Music", ai: "AI assistant" };
+const PANEL_EL = { calendar: "cal", messages: "msgp", music: "spot", ai: "cl", reminders: "remp" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", music: "Music", ai: "AI assistant", reminders: "Reminders" };
 const SIZE_FR = { s: "0.8fr", m: "1.1fr", l: "1.4fr" };
-let layout = { panels: [{ id: "calendar", on: true, size: "m" }, { id: "messages", on: true, size: "m" }, { id: "music", on: true, size: "l" }, { id: "ai", on: true, size: "s" }], music: "spotify", ai: "claude", aiTask: true };
+let layout = { panels: [{ id: "calendar", on: true, size: "m" }, { id: "messages", on: true, size: "m" }, { id: "music", on: true, size: "l" }, { id: "ai", on: true, size: "s" }, { id: "reminders", on: true, size: "m" }], music: "spotify", ai: "claude", aiTask: true };
 function applyLayout() {
   const cols = [];
   layout.panels.forEach((p, i) => {
@@ -269,6 +299,7 @@ function applyLayout() {
   });
   document.querySelector(".grid").style.gridTemplateColumns = cols.join(" ") || "1fr";
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
+  loadBadges(); loadReminders(false);
   applyAi();
   applyMusicMode();
 }
@@ -529,6 +560,65 @@ $("msgs").addEventListener("click", ev => {
   if (b) macOpen({ kind: "message", id: +b.dataset.msg }, b);
 });
 $("msgp").querySelector(".label").addEventListener("click", () => macOpen({ kind: "messages-app" }));
+
+/* ---------- unread badges from the Dock ---------- */
+const SHORT_APP = n => n.replace(/^Microsoft /, "");
+async function loadBadges() {
+  if (SETTINGS_PAGE || prefs.badges === false || !layout.panels.find(p => p.id === "messages" && p.on)) { $("badges").innerHTML = ""; return; }
+  let d; try { d = await (await fetch("/api/badges")).json(); } catch (e) { return; }
+  $("badges").innerHTML = (d.apps || []).filter(a => a.running).map(a => {
+    const n = a.label || "";
+    return `<button class="bdg ${n ? "" : "zero"}" data-app="${esc(a.app)}">${esc(SHORT_APP(a.app))}<b>${esc(n || "0")}</b></button>`;
+  }).join("");
+}
+$("badges").addEventListener("click", ev => { const b = ev.target.closest("[data-app]"); if (b) macOpen({ kind: "app", app: b.dataset.app }, b); });
+setInterval(loadBadges, 10000);
+
+/* ---------- Apple Reminders ---------- */
+let remItems = [];
+function remDue(r) {
+  if (!r.due) return { text: r.list, cls: "", sort: 9e15 };
+  const d = new Date(r.due), now = new Date(), t0 = dayStart(now), t1 = new Date(t0.getTime() + 86400000), t2 = new Date(t1.getTime() + 86400000);
+  const time = r.allDay ? "" : " " + fmtTime(d);
+  let text, cls = "";
+  if (d < (r.allDay ? t0 : now)) { text = "Overdue" + (d < t0 ? " · " + d.toLocaleDateString([], { month: "short", day: "numeric" }) : time); cls = "over"; }
+  else if (d < t1) { text = "Today" + time; cls = "today"; }
+  else if (d < t2) text = "Tomorrow" + time;
+  else text = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) + time;
+  return { text: text + " · " + r.list, cls, sort: d.getTime() };
+}
+function renderReminders(d) {
+  if (!d.ok) {
+    $("remcount").textContent = "";
+    $("rems").innerHTML = d.error === "permission"
+      ? `<div class="empty">Reminders needs permission.<br><span style="font-size:15px">System Settings → Privacy &amp; Security → Reminders → turn on <b>Terminal</b>, then restart the Command Center.</span></div>`
+      : `<div class="empty">Can't read Reminders right now.</div>`;
+    return;
+  }
+  remItems = d.items.map(r => Object.assign({}, r, { _d: remDue(r) }))
+    .sort((a, b) => (b.priority === 1) - (a.priority === 1) || a._d.sort - b._d.sort);
+  const urgent = remItems.filter(r => r._d.cls).length;
+  $("remcount").textContent = remItems.length ? (urgent ? urgent + " due" : remItems.length + " open") : "";
+  $("rems").innerHTML = remItems.length ? remItems.slice(0, 9).map((r, i) => `
+    <div class="rem" data-i="${i}"><button class="ck" aria-label="Complete ${esc(r.title)}"><i></i></button>
+      <div style="min-width:0"><div class="t">${r.priority === 1 ? '<span class="bang">!</span>' : ""}${esc(r.title)}</div><div class="m ${r._d.cls}">${esc(r._d.text)}</div></div></div>`).join("")
+    : `<div class="empty">All done. Nothing open.</div>`;
+}
+async function loadReminders(force) {
+  if (SETTINGS_PAGE || !layout.panels.find(p => p.id === "reminders" && p.on)) return;
+  try { renderReminders(await (await fetch("/api/reminders" + (force ? "?force=1" : ""))).json()); } catch (e) {}
+}
+$("rems").addEventListener("click", async ev => {
+  const b = ev.target.closest(".ck"); if (!b) return;
+  const row = b.closest(".rem"), r = remItems[+row.dataset.i];
+  if (!r || row.classList.contains("done")) return;
+  row.classList.add("done");
+  try { await fetch("/api/reminders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: r.id }) }); } catch (e) {}
+  setTimeout(() => loadReminders(true), 1500);
+});
+$("remlabel").addEventListener("click", () => macOpen({ kind: "app", app: "Reminders" }));
+$("remlabel").style.cursor = "pointer";
+setInterval(() => loadReminders(false), 30000);
 
 /* =========================================================
    SPOTIFY (PKCE: no secret needed, tokens stay in this browser)
@@ -905,6 +995,8 @@ async function openSetup() {
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
   $("msgFirst").checked = prefs.msgNames === "first";
+  $("badgesOn").checked = prefs.badges !== false;
+  $("badgeApps").value = (prefs.badgeApps || []).join(", ");
   loadNameRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
@@ -935,7 +1027,8 @@ $("spotlogout").onclick = async () => {
 };
 $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
-  const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full" };
+  const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full",
+    badges: $("badgesOn").checked, badgeApps: $("badgeApps").value.split(",").map(x => x.trim()).filter(Boolean) };
   const cals = [...$("calrows").children].map(r => ({
     name: r.querySelector(".cn").value.trim() || "Calendar",
     color: r.querySelector(".cc").value,
