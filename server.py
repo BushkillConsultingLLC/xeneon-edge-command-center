@@ -8,6 +8,7 @@ status file. Uses only the Python standard library.
 import glob
 import json
 import os
+import plistlib
 import re
 import sqlite3
 import subprocess
@@ -124,6 +125,48 @@ def text_from_attributed(blob):
         return ""
 
 
+_blocked = {"t": 0, "set": set()}
+
+
+def blocked_handles():
+    """Numbers and emails on the Mac's block list (Messages/FaceTime/Phone share it).
+    macOS keeps it in the com.apple.cmfsyncagent preferences."""
+    if time.time() - _blocked["t"] < 120:
+        return _blocked["set"]
+    found = set()
+    data = None
+    try:
+        r = subprocess.run(["/usr/bin/defaults", "export", "com.apple.cmfsyncagent", "-"],
+                           capture_output=True, timeout=4)
+        if r.returncode == 0 and r.stdout:
+            data = plistlib.loads(r.stdout)
+    except Exception:
+        data = None
+    if data is None:
+        try:
+            with open(os.path.expanduser("~/Library/Preferences/com.apple.cmfsyncagent.plist"), "rb") as f:
+                data = plistlib.load(f)
+        except Exception:
+            data = None
+
+    def walk(v):
+        if isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+        elif isinstance(v, str):
+            t = v.strip()
+            if re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", t) or re.fullmatch(r"\+?[\d\s().-]{5,}", t):
+                k = norm_handle(t)
+                if k:
+                    found.add(k)
+    walk(data)
+    _blocked["t"], _blocked["set"] = time.time(), found
+    return found
+
+
 def recent_messages(limit=12):
     if not os.path.exists(CHAT_DB):
         return {"ok": False, "error": "no_db"}
@@ -138,6 +181,13 @@ def recent_messages(limit=12):
         not_deleted = ""
         if "chat_recoverable_message_join" in tables:
             not_deleted = "AND m.ROWID NOT IN (SELECT message_id FROM chat_recoverable_message_join)"
+        # Blocked senders' chats are "blackholed"; spam/junk is flagged too (column names vary by macOS)
+        chat_cols = {r[1] for r in con.execute("PRAGMA table_info(chat)")}
+        msg_cols = {r[1] for r in con.execute("PRAGMA table_info(message)")}
+        if "is_blackholed" in chat_cols:
+            not_deleted += " AND COALESCE(c.is_blackholed, 0) = 0"
+        if "is_spam" in msg_cols:
+            not_deleted += " AND COALESCE(m.is_spam, 0) = 0"
         rows = con.execute("""
             SELECT m.ROWID, m.date, m.text, m.attributedBody, h.id,
                    c.display_name, c.chat_identifier, m.is_read,
@@ -151,7 +201,7 @@ def recent_messages(limit=12):
               AND m.item_type = 0
               %s
             ORDER BY m.date DESC
-            LIMIT ?""" % not_deleted, (limit * 2,)).fetchall()
+            LIMIT ?""" % not_deleted, (limit * 4,)).fetchall()
     except sqlite3.DatabaseError as e:
         con.close()
         return {"ok": False, "error": "no_access", "detail": str(e)}
@@ -159,9 +209,12 @@ def recent_messages(limit=12):
     contacts = load_contacts()
     name_style = get_prefs().get("msgNames", "full")
     overrides = load_config().get("nameOverrides") or {}
+    blocked = blocked_handles()
     out, seen = [], set()
     for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att in rows:
         if rowid in seen:
+            continue
+        if norm_handle(handle) in blocked or (not group_name and norm_handle(chat_id) in blocked):
             continue
         seen.add(rowid)
         body = text or text_from_attributed(attr)
