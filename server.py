@@ -497,7 +497,7 @@ def run_action(a):
 
 DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
-                 "calSource": "links", "hiddenCals": [], "tiles": {},
+                 "calSource": "links", "hiddenCals": [], "tiles": {}, "hiddenRemLists": [],
                  "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
                  "actions": DEFAULT_ACTIONS}
 
@@ -542,6 +542,8 @@ def get_prefs():
         p["actions"] = [a for a in (clean_action(x) for x in saved["actions"][:16]) if a]
     if saved.get("calSource") in ("links", "apple", "both"):
         p["calSource"] = saved["calSource"]
+    if isinstance(saved.get("hiddenRemLists"), list):
+        p["hiddenRemLists"] = [str(x)[:100] for x in saved["hiddenRemLists"]][:50]
     if isinstance(saved.get("hiddenCals"), list):
         p["hiddenCals"] = [str(x)[:200] for x in saved["hiddenCals"]][:200]
     if saved.get("msgNames") in ("full", "first"):
@@ -829,6 +831,7 @@ set out to ""
 tell application "Reminders"
   repeat with L in lists
     set lname to name of L
+    set out to out & "#LIST" & tab & lname & linefeed
     set rs to (reminders of L whose completed is false)
     repeat with r in rs
       set d to ""
@@ -861,17 +864,29 @@ def reminders(force=False):
         data = {"ok": False, "error": "permission" if ("-1743" in err or "-1728" in err or "not allowed" in err.lower()) else "script",
                 "detail": err[:200]}
     else:
-        items = []
+        items, lists = [], []
         for line in out.splitlines():
             parts = line.split("\t")
+            if len(parts) == 2 and parts[0] == "#LIST":
+                lists.append(parts[1].strip())
+                continue
             if len(parts) < 6:
                 continue
             rid, lst, due, allday, prio, name = parts[0], parts[1], parts[2], parts[3], parts[4], "\t".join(parts[5:])
             items.append({"id": rid, "list": lst, "due": due, "allDay": allday == "1",
                           "priority": int(prio) if prio.isdigit() else 0, "title": name.strip()})
-        data = {"ok": True, "items": items}
+        data = {"ok": True, "items": items, "lists": lists}
     _rem_cache.update(t=time.time(), data=data)
     return data
+
+
+def reminders_shown(force=False, show_all=False):
+    """Reminders minus the lists switched off in settings (e.g. a grocery list)."""
+    d = reminders(force)
+    if not d.get("ok") or show_all:
+        return d
+    hidden = set(get_prefs()["hiddenRemLists"])
+    return dict(d, items=[i for i in d["items"] if i["list"] not in hidden])
 
 
 def complete_reminder(rid):
@@ -1039,7 +1054,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(badge_catalog())
             return self._json(badges())
         if p == "/api/reminders":
-            return self._json(reminders(force=parse_qs(u.query).get("force") == ["1"]))
+            q = parse_qs(u.query)
+            return self._json(reminders_shown(force=q.get("force") == ["1"], show_all=q.get("all") == ["1"]))
         if p == "/api/weather":
             return self._json(weather(force=parse_qs(u.query).get("force") == ["1"]))
         if p == "/api/geocode":
@@ -1188,7 +1204,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles", "weather", "actions"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

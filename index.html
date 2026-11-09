@@ -403,6 +403,9 @@
     <button class="ghost" id="addAct" type="button">+ Add a button</button>
     <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients.</div>
     <hr>
+    <div class="fld"><label>Reminders: lists to show</label></div>
+    <div id="remrows" class="hint" style="margin:0 0 10px">Loading lists…</div>
+    <hr>
     <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it, or tick Hide to keep a sender off the Edge)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
     <div class="fld"><label>Notifications panel: apps to count</label></div>
@@ -1239,6 +1242,20 @@ function actRow(a) {
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
+async function loadRemRows() {
+  const box = $("remrows");
+  let d; try { d = await (await fetch("/api/reminders?all=1")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
+  if (!d.ok) { box.textContent = "Reminders isn't connected yet."; return; }
+  const lists = d.lists && d.lists.length ? d.lists : [...new Set(d.items.map(i => i.list))];
+  const hidden = new Set(prefs.hiddenRemLists || []);
+  box.className = ""; box.innerHTML = "";
+  lists.forEach(n => {
+    const r = document.createElement("label"); r.className = "chk";
+    r.innerHTML = `<input type="checkbox" data-remlist="${esc(n)}" ${hidden.has(n) ? "" : "checked"}> ${esc(n)}`;
+    box.appendChild(r);
+  });
+  if (!lists.length) box.textContent = "No lists found.";
+}
 function loadActionRows() {
   const box = $("actrows"); box.innerHTML = "";
   (prefs.actions || []).forEach(a => box.appendChild(actRow(a)));
@@ -1412,6 +1429,7 @@ async function openSetup() {
   wxDraft = prefs.weather && prefs.weather.lat != null ? Object.assign({}, prefs.weather) : null;
   $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
   loadActionRows();
+  loadRemRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
@@ -1445,6 +1463,9 @@ $("save").onclick = async () => {
     calSource: $("calSource").value,
     weather: Object.assign({}, wxDraft || { name: "", lat: null, lon: null }, { units: $("wxUnits").value }),
     actions: collectActions(),
+    hiddenRemLists: document.querySelector("#remrows input[data-remlist]")
+      ? [...document.querySelectorAll("#remrows input[data-remlist]")].filter(i => !i.checked).map(i => i.dataset.remlist)
+      : (prefs.hiddenRemLists || []),
     hiddenCals: document.querySelector("#applerows input[data-cal]")
       ? [...document.querySelectorAll("#applerows input[data-cal]")].filter(i => !i.checked).map(i => i.dataset.cal)
       : (prefs.hiddenCals || []),
