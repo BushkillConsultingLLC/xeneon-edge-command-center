@@ -332,6 +332,16 @@
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .chk { display: flex; gap: 10px; align-items: center; font-size: 15px; color: var(--fg); margin: 4px 0 6px; }
   .hint { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  details.sec { border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
+  details.sec > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; gap: 12px; font-size: 17px; font-weight: 700; color: var(--fg); user-select: none; }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary:hover { background: var(--panel2); border-radius: 14px; }
+  details.sec > summary .car { width: 9px; height: 9px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .15s; flex: none; margin: 0 2px; }
+  details.sec[open] > summary .car { transform: rotate(45deg); }
+  details.sec > summary .sub { font-weight: 400; font-size: 13px; color: var(--muted); }
+  details.sec .secb { padding: 4px 16px 16px; }
+  .secctl { text-align: right; font-size: 13px; color: var(--dim); margin: -4px 0 8px; }
+  .linkbtn { background: none; border: 0; color: var(--blue); font-size: 13px; padding: 2px; }
   hr { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
 </style>
 </head>
@@ -418,50 +428,19 @@
   <div class="sheet">
     <h2>Command Center settings</h2>
     <p>These stay on this Mac. Calendar links are private: anyone with one can read that calendar, so don't share them.</p>
+    <div class="secctl"><button class="linkbtn" id="secOpen" type="button">Expand all</button> · <button class="linkbtn" id="secClose" type="button">Collapse all</button></div>
+    <details class="sec" data-sec="layout" open>
+      <summary><span class="car"></span>Layout<span class="sub">What goes where on the Edge</span></summary>
+      <div class="secb">
     <div class="fld"><label>Layout: drag a tile to move it, drag its corner to resize. This box is the Edge: 8 across, 4 down.</label></div>
     <div class="led" id="led"></div>
     <div class="ltray" id="ltray"></div>
     <div class="hint" id="zerr"></div>
-    <div class="two" style="margin-top:14px">
-      <div class="fld"><label for="musicSrc">Music</label><select id="musicSrc"><option value="spotify">Spotify</option><option value="apple">Apple Music</option></select></div>
-      <div class="fld"><label for="aiSrc">AI assistant status</label><select id="aiSrc"><option value="claude">Claude</option><option value="openai">ChatGPT / OpenAI</option><option value="github">GitHub Copilot</option><option value="none">None</option></select></div>
-    </div>
-    <label class="chk"><input type="checkbox" id="aiTask"> Show the "what it's working on" card</label>
-    <div class="hint">Claude Code and Codex can fill that card automatically: see "AI task card" in the README.</div>
-    <hr>
-    <div id="spotFields">
-      <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
-      <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
-      <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
-      <hr>
-    </div>
-    <div class="fld"><label for="wxSearch">Weather location</label>
-      <div style="display:flex;gap:8px"><input id="wxSearch" placeholder="Search a city or ZIP, e.g. Easton, PA" spellcheck="false" style="flex:1">
-      <select id="wxUnits" style="width:110px"><option value="f">°F</option><option value="c">°C</option></select></div>
-      <div class="hint" id="wxCur"></div><div class="wxres" id="wxRes"></div></div>
-    <hr>
-    <div class="fld"><label>Quick Actions: buttons on the Edge (icon, name, what it does)</label></div>
-    <div id="actrows"></div>
-    <button class="ghost" id="addAct" type="button">+ Add a button</button>
-    <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients. Light: switch one of your Govee rooms on and off, or turn every light off.</div>
-    <hr>
-    <div class="fld"><label for="goveeKey">Lights: Govee API key</label>
-      <input id="goveeKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the key Govee emailed you">
-      <div class="hint">Get a free key in the Govee Home app: Profile → ⚙︎ Settings → Apply for API Key. Govee emails it to you. It's stored only on this Mac.</div></div>
-    <div id="lightrows" class="hint" style="margin:0 0 10px"></div>
-    <hr>
-    <div class="fld"><label>Reminders: lists to show</label></div>
-    <div id="remrows" class="hint" style="margin:0 0 10px">Loading lists…</div>
-    <hr>
-    <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it, or tick Hide to keep a sender off the Edge)</label></div>
-    <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
-    <div class="fld"><label>Notifications panel: apps to count</label></div>
-    <div id="badgerows" class="hint">Loading…</div>
-    <div class="fld" style="margin-top:8px"><label for="badgeApps">Other apps (exact name from your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false" placeholder="e.g. Zoom, Spark"></div>
-    <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
-    <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
-    <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
-    <hr>
+      </div>
+    </details>
+    <details class="sec" data-sec="calendar">
+      <summary><span class="car"></span>Calendar<span class="sub">Apple Calendar or calendar links</span></summary>
+      <div class="secb">
     <div class="fld"><label for="calSource">Calendar source</label>
       <select id="calSource"><option value="links">Calendar links (ICS)</option><option value="apple">Apple Calendar on this Mac</option><option value="both">Both</option></select>
       <div class="hint">Apple Calendar shows every calendar your Mac knows: iCloud, Google (including calendars shared with you), Outlook/Exchange. Add accounts in System Settings → Internet Accounts.</div></div>
@@ -471,6 +450,84 @@
     <div id="calrows"></div>
     <button class="ghost" id="addcal">+ Add calendar</button>
     </div>
+      </div>
+    </details>
+    <details class="sec" data-sec="messages">
+      <summary><span class="car"></span>Messages<span class="sub">Names, hidden senders</span></summary>
+      <div class="secb">
+    <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it, or tick Hide to keep a sender off the Edge)</label></div>
+    <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
+    <label class="chk"><input type="checkbox" id="msgFirst"> Messages: show first names only (nicknames from Contacts are always used)</label>
+      </div>
+    </details>
+    <details class="sec" data-sec="notifications">
+      <summary><span class="car"></span>Notifications<span class="sub">Which apps to count</span></summary>
+      <div class="secb">
+    <div class="fld"><label>Notifications panel: apps to count</label></div>
+    <div id="badgerows" class="hint">Loading…</div>
+    <div class="fld" style="margin-top:8px"><label for="badgeApps">Other apps (exact name from your Applications folder, comma separated)</label><input id="badgeApps" spellcheck="false" placeholder="e.g. Zoom, Spark"></div>
+      </div>
+    </details>
+    <details class="sec" data-sec="music">
+      <summary><span class="car"></span>Music<span class="sub">Spotify or Apple Music, speaker</span></summary>
+      <div class="secb">
+      <div class="fld"><label for="musicSrc">Music</label><select id="musicSrc"><option value="spotify">Spotify</option><option value="apple">Apple Music</option></select></div>
+    <div id="spotFields">
+      <div class="fld"><label>Spotify Client ID</label><input id="cid" placeholder="From developer.spotify.com → your app → Settings" spellcheck="false"></div>
+      <div class="fld"><label>Speaker to send music to</label><input id="officeName" placeholder="office speakers" spellcheck="false"></div>
+      <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
+    </div>
+      </div>
+    </details>
+    <details class="sec" data-sec="weather">
+      <summary><span class="car"></span>Weather<span class="sub">Location and units</span></summary>
+      <div class="secb">
+    <div class="fld"><label for="wxSearch">Weather location</label>
+      <div style="display:flex;gap:8px"><input id="wxSearch" placeholder="Search a city or ZIP, e.g. Easton, PA" spellcheck="false" style="flex:1">
+      <select id="wxUnits" style="width:110px"><option value="f">°F</option><option value="c">°C</option></select></div>
+      <div class="hint" id="wxCur"></div><div class="wxres" id="wxRes"></div></div>
+      </div>
+    </details>
+    <details class="sec" data-sec="reminders">
+      <summary><span class="car"></span>Reminders<span class="sub">Lists to show</span></summary>
+      <div class="secb">
+    <div class="fld"><label>Reminders: lists to show</label></div>
+    <div id="remrows" class="hint" style="margin:0 0 10px">Loading lists…</div>
+      </div>
+    </details>
+    <details class="sec" data-sec="lights">
+      <summary><span class="car"></span>Lights<span class="sub">Govee key, rooms</span></summary>
+      <div class="secb">
+    <div class="fld"><label for="goveeKey">Lights: Govee API key</label>
+      <input id="goveeKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the key Govee emailed you">
+      <div class="hint">Get a free key in the Govee Home app: Profile → ⚙︎ Settings → Apply for API Key. Govee emails it to you. It's stored only on this Mac.</div></div>
+    <div id="lightrows" class="hint" style="margin:0 0 10px"></div>
+      </div>
+    </details>
+    <details class="sec" data-sec="actions">
+      <summary><span class="car"></span>Quick Actions<span class="sub">Your buttons</span></summary>
+      <div class="secb">
+    <div class="fld"><label>Quick Actions: buttons on the Edge (icon, name, what it does)</label></div>
+    <div id="actrows"></div>
+    <button class="ghost" id="addAct" type="button">+ Add a button</button>
+    <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients. Light: switch one of your Govee rooms on and off, or turn every light off.</div>
+      </div>
+    </details>
+    <details class="sec" data-sec="ai">
+      <summary><span class="car"></span>AI assistant<span class="sub">Status and task card</span></summary>
+      <div class="secb">
+      <div class="fld"><label for="aiSrc">AI assistant status</label><select id="aiSrc"><option value="claude">Claude</option><option value="openai">ChatGPT / OpenAI</option><option value="github">GitHub Copilot</option><option value="none">None</option></select></div>
+    <label class="chk"><input type="checkbox" id="aiTask"> Show the "what it's working on" card</label>
+    <div class="hint">Claude Code and Codex can fill that card automatically: see "AI task card" in the README.</div>
+      </div>
+    </details>
+    <details class="sec" data-sec="display">
+      <summary><span class="car"></span>Display<span class="sub">Full screen, restart</span></summary>
+      <div class="secb">
+    <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
+    <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
+      </div>
+    </details>
     <div class="actions">
       <span class="saved" id="savedmsg"></span>
       <button class="ghost" id="spotlogout">Disconnect Spotify</button>
@@ -1610,6 +1667,18 @@ function collectOverrides() {
   document.querySelectorAll("#namerows input[data-key]").forEach(i => { if (i.value.trim()) out[i.dataset.key] = i.value.trim(); });
   return out;
 }
+/* settings sections: remember which are open (per browser) */
+function initSections() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("cc.secOpen") || "null"); } catch (e) {}
+  const all = [...document.querySelectorAll("details.sec")];
+  if (Array.isArray(saved)) all.forEach(d => d.open = saved.includes(d.dataset.sec));
+  const remember = () => { try { localStorage.setItem("cc.secOpen", JSON.stringify(all.filter(d => d.open).map(d => d.dataset.sec))); } catch (e) {} };
+  all.forEach(d => d.addEventListener("toggle", remember));
+  $("secOpen").onclick = () => { all.forEach(d => d.open = true); remember(); };
+  $("secClose").onclick = () => { all.forEach(d => d.open = false); remember(); };
+}
+initSections();
 async function openSetup() {
   draftBoxes = JSON.parse(JSON.stringify(layout.boxes || {}));
   renderLayoutEditor();
