@@ -467,8 +467,10 @@ def clean_action(a):
             return None
     if t == "system" and target not in SYSTEM_ACTIONS:
         return None
-    if t == "light" and len(target) > 30:
-        return None
+    if t == "light":
+        room, _, mode = target.partition("|")
+        if len(room) > 30 or (mode and mode not in ("on", "off") and not (mode.isdigit() and 1 <= int(mode) <= 100)):
+            return None
     return {"icon": icon, "label": label or target[:24], "type": t, "target": target}
 
 
@@ -637,7 +639,10 @@ def run_action(a):
     if t == "light":
         if target == "__all_off__":
             return lights_control("", "all-off").get("ok")
-        return lights_control(target, "toggle").get("ok")
+        room, _, mode = target.partition("|")
+        if mode.isdigit():
+            return lights_control(room, "brightness", int(mode)).get("ok")
+        return lights_control(room, mode if mode in ("on", "off") else "toggle").get("ok")
     if t == "system" and target == "screensaver":
         return mac_open(["-a", "ScreenSaverEngine"])
     return False
@@ -1098,6 +1103,9 @@ def lights_control(room, action, value=None):
         else:
             continue
         try:
+            if action == "brightness" and not (_govee["states"].get(d["device"]) or {}).get("on"):
+                _govee_call("POST", "/device/control", {"sku": d["sku"], "device": d["device"], "capability":
+                            {"type": "devices.capabilities.on_off", "instance": "powerSwitch", "value": 1}})
             _govee_call("POST", "/device/control", {"sku": d["sku"], "device": d["device"], "capability": cap})
             st = _govee["states"].setdefault(d["device"], {"online": True, "on": None, "bright": None})
             st["t"] = time.time()            # trust what we just sent; re-check on the normal schedule

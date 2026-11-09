@@ -1409,7 +1409,9 @@ const iconUrl = a => "/api/icon?" + new URLSearchParams({ type: a.type, target: 
 function iconHtml(a) {
   if (a.icon === "auto" && REAL_ICON_TYPES.includes(a.type) && a.target)
     return `<img src="${esc(iconUrl(a))}" alt="" onerror="this.replaceWith(document.createTextNode('${esc((a.label || "?").trim()[0] || "?").replace(/'/g, "")}'))">`;
-  return esc(a.icon && a.icon !== "auto" ? a.icon : "▶︎");
+  if (a.icon && a.icon !== "auto") return esc(a.icon);
+  if (a.type === "light") return /\|off$|__all_off__/.test(a.target || "") ? "🌙" : "💡";
+  return { shortcut: "⚡", system: "🔒" }[a.type] || "▶︎";
 }
 const ICONS = {
   "Work": "💼 📁 📂 🗂️ 📊 📈 📝 📅 ✉️ 📧 📞 💬 🎥 🖥️ 💻 🧾",
@@ -1468,10 +1470,17 @@ function actRow(a) {
   const drawTarget = (val) => {
     if (tp.value === "light") {
       const rooms = lightRooms || [];
-      tw.innerHTML = `<select class="tg" aria-label="Which light"><option value="__all_off__">All lights off</option>${rooms.map(r => `<option value="${esc(r)}">Turn ${esc(r)} on/off</option>`).join("")}</select>`;
-      const sel = tw.querySelector(".tg");
-      if (val && val !== "__all_off__" && !rooms.includes(val)) sel.insertAdjacentHTML("beforeend", `<option value="${esc(val)}">Turn ${esc(val)} on/off</option>`);
-      sel.value = val || (rooms[0] || "__all_off__");
+      const [room, mode] = (val || "").split("|");
+      tw.innerHTML = `<span style="display:flex;gap:6px"><select class="lroom" aria-label="Which light" style="flex:1.2"><option value="__all_off__">All lights off</option>${rooms.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("")}</select>
+        <select class="lmode" aria-label="What to do" style="flex:1"><option value="">On/off (toggle)</option><option value="on">Turn on</option><option value="off">Turn off</option>
+        ${[100, 75, 50, 25, 10].map(n => `<option value="${n}">${n}% brightness</option>`).join("")}</select></span><input type="hidden" class="tg">`;
+      const sel = tw.querySelector(".lroom"), md = tw.querySelector(".lmode"), hid = tw.querySelector(".tg");
+      if (room && room !== "__all_off__" && !rooms.includes(room)) sel.insertAdjacentHTML("beforeend", `<option value="${esc(room)}">${esc(room)}</option>`);
+      sel.value = room || (rooms[0] || "__all_off__");
+      if (mode && ![...md.options].some(o => o.value === mode)) md.insertAdjacentHTML("beforeend", `<option value="${esc(mode)}">${esc(mode)}% brightness</option>`);
+      md.value = mode || "";
+      const sync = () => { md.disabled = sel.value === "__all_off__"; hid.value = sel.value === "__all_off__" ? "__all_off__" : sel.value + (md.value ? "|" + md.value : ""); };
+      sel.onchange = md.onchange = sync; sync();
     } else if (tp.value === "system") {
       tw.innerHTML = `<select class="tg" aria-label="What it does"><option value="lock">Lock screen</option><option value="screensaver">Start screen saver</option></select>`;
       tw.querySelector(".tg").value = ["lock", "screensaver"].includes(val) ? val : "lock";
