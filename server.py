@@ -480,7 +480,7 @@ function run(argv) {
   var img = $.NSWorkspace.sharedWorkspace.iconForFile(argv[0]);
   img.setSize($.NSMakeSize(256, 256));
   var rep = $.NSBitmapImageRep.imageRepWithData(img.TIFFRepresentation);
-  var png = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $());
+  var png = rep.representationUsingTypeProperties(4, $());   // 4 = PNG
   return png.writeToFileAtomically(argv[1], true) ? "ok" : "fail";
 }'''
 
@@ -517,6 +517,17 @@ def _png_ok(path):
         return False
 
 
+def _icon_log(line):
+    """Local troubleshooting note for icons that couldn't be made."""
+    try:
+        path = os.path.join(ROOT, "icon-debug.txt")
+        old = open(path).read().splitlines()[-30:] if os.path.exists(path) else []
+        with open(path, "w") as f:
+            f.write("\n".join(old + [time.strftime("%Y-%m-%d %H:%M:%S ") + line]) + "\n")
+    except Exception:
+        pass
+
+
 def action_icon(a):
     """Path to a cached icon image for this action, or None."""
     t, target = a["type"], a["target"]
@@ -530,14 +541,38 @@ def action_icon(a):
     if t in ("app", "folder"):
         src = app_path(target) if t == "app" else os.path.realpath(os.path.expanduser(target))
         if not src or not os.path.exists(src):
+            _icon_log("%s: not found" % target)
             return None
+        notes = []
+        # 1) the app's .icns file, converted with sips (works for most apps)
+        if t == "app":
+            try:
+                with open(os.path.join(src, "Contents", "Info.plist"), "rb") as f:
+                    info = plistlib.load(f)
+                icon = info.get("CFBundleIconFile") or ""
+                if icon:
+                    icns = os.path.join(src, "Contents", "Resources", icon if icon.endswith(".icns") else icon + ".icns")
+                    r = subprocess.run(["/usr/bin/sips", "-s", "format", "png", "-Z", "128", icns, "--out", out],
+                                       capture_output=True, text=True, timeout=10)
+                    if _png_ok(out):
+                        return out
+                    notes.append("sips: " + (r.stderr or r.stdout)[:200])
+                else:
+                    notes.append("no CFBundleIconFile")
+            except Exception as e:
+                notes.append("plist: %s" % e)
+        # 2) ask macOS for the icon it shows in Finder (apps with no .icns, folders)
         try:
-            subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", ICON_JXA, src, out],
-                           capture_output=True, timeout=8)
-            subprocess.run(["/usr/bin/sips", "-Z", "128", out], capture_output=True, timeout=8)
-        except Exception:
-            return None
-        return out if _png_ok(out) else None
+            r = subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", ICON_JXA, src, out],
+                               capture_output=True, text=True, timeout=10)
+            if _png_ok(out):
+                subprocess.run(["/usr/bin/sips", "-Z", "128", out], capture_output=True, timeout=10)
+                return out
+            notes.append("jxa: " + (r.stderr or r.stdout)[:300])
+        except Exception as e:
+            notes.append("jxa: %s" % e)
+        _icon_log("%s (%s): %s" % (target, src, " | ".join(notes)))
+        return None
     host = urlparse(target).hostname or ""
     if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host):
         return None
