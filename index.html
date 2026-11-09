@@ -18,7 +18,7 @@
     -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
   .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
-    grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+    grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); }
   .panel.off { display: none; }
   .panel { container-type: size; container-name: panel; background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
     display: flex; flex-direction: column; position: relative; overflow: hidden; }
@@ -108,12 +108,53 @@
     .cb.sm { display: none; }
   }
 
-  /* ---------- zone picker (settings) ---------- */
-  .zones { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .zones label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; letter-spacing: .06em; }
-  .zprev { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 54px); gap: 6px; margin-top: 12px; background: #000; padding: 6px; border-radius: 12px; }
-  .zprev div { border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; color: #000; }
-  .zprev .empty-z { background: var(--panel2); color: var(--dim); font-weight: 400; }
+  /* ---------- one-row tiles (a quarter of the Edge's height) ---------- */
+  .panel[data-h="1"] { padding: 12px 16px; }
+  .panel[data-h="1"] .label { font-size: 11px; }
+  .panel[data-h="1"] .pill { font-size: 11px; padding: 2px 8px; }
+  .panel[data-h="1"] .ntiles { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-auto-rows: 1fr; grid-template-rows: 1fr; margin-top: 8px; gap: 6px; }
+  .panel[data-h="1"] .ntile { flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; padding: 6px 10px; border-radius: 10px; }
+  .panel[data-h="1"] .ntile .n { font-size: 24px; }
+  .panel[data-h="1"] .ntile .a { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel[data-h="1"] .ntile.closed { display: none; }
+  .panel[data-h="1"] .clock { margin-bottom: 6px; } .panel[data-h="1"] .clock .t { font-size: 34px; } .panel[data-h="1"] .clock .d { font-size: 14px; }
+  .panel[data-h="1"] .next { padding: 6px 12px; margin: 0; } .panel[data-h="1"] .next .k { display: none; }
+  .panel[data-h="1"] .next .title { font-size: 17px; margin: 0; } .panel[data-h="1"] .next .meta { font-size: 13px; }
+  .panel[data-h="1"] .join { font-size: 14px; padding: 6px 12px; min-height: 36px; } .panel[data-h="1"] .hasjoin { display: none; }
+  .panel[data-h="1"] .agenda, .panel[data-h="1"] .allday { display: none; }
+  .panel[data-h="1"] .msgs { margin-top: 6px; gap: 6px; } .panel[data-h="1"] .msg { padding: 6px 10px; }
+  .panel[data-h="1"] .msg .body { -webkit-line-clamp: 1; font-size: 14px; margin-top: 2px; } .panel[data-h="1"] .msg .who { font-size: 15px; }
+  .panel[data-h="1"] .sp-body { margin-top: 6px; gap: 12px; } .panel[data-h="1"] .art { width: calc(100cqh - 46px); }
+  .panel[data-h="1"] .track { font-size: 17px; -webkit-line-clamp: 1; } .panel[data-h="1"] .artist { font-size: 13px; }
+  .panel[data-h="1"] .prog, .panel[data-h="1"] .dev, .panel[data-h="1"] #spot .label { display: none; }
+  .panel[data-h="1"] .ctrls { margin-top: 2px; gap: 6px; } .panel[data-h="1"] .cb { width: 38px; height: 38px; } .panel[data-h="1"] .cb.play { width: 44px; height: 44px; }
+  .panel[data-h="1"] .cb svg { width: 18px; height: 18px; } .panel[data-h="1"] .cb.sm { display: none; }
+  .panel[data-h="1"] .svc { margin-top: 6px; font-size: 14px; } .panel[data-h="1"] .svc-sub { display: none; }
+  .panel[data-h="1"] .task { margin-top: 6px; padding: 6px 10px; border-radius: 10px; } .panel[data-h="1"] .task .ttl { font-size: 15px; margin: 2px 0 0; }
+  .panel[data-h="1"] .task .det, .panel[data-h="1"] .steps { display: none; } .panel[data-h="1"] .task .state { font-size: 11px; }
+  .panel[data-h="1"] .rems { margin-top: 4px; } .panel[data-h="1"] .rem { min-height: 34px; } .panel[data-h="1"] .rem .t { font-size: 15px; } .panel[data-h="1"] .rem .m { display: none; }
+  /* ---------- one-column tiles (an eighth of the width) ---------- */
+  .panel[data-w="1"] { padding: 14px 14px; }
+  .panel[data-w="1"] .ev { grid-template-columns: 58px 8px 1fr; gap: 8px; font-size: 15px; } .panel[data-w="1"] .ev .tm { font-size: 12px; }
+  .panel[data-w="1"] .clock { flex-direction: column; gap: 2px; } .panel[data-w="1"] .clock .t { font-size: 40px; }
+  .panel[data-w="1"] .next .title { padding-right: 0; } .panel[data-w="1"] .join { position: static; transform: none; margin-top: 6px; }
+  .panel[data-w="1"] .art { display: none; } .panel[data-w="1"] .cb.sm { display: none; }
+  .panel[data-w="1"] .ntiles { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+  .panel[data-w="1"] .task .ttl { font-size: 17px; }
+
+  /* ---------- layout editor (settings) ---------- */
+  .led { position: relative; aspect-ratio: 2560 / 720; background: #000; border-radius: 12px; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .led .cell { position: absolute; border: 1px dashed #2b3038; border-radius: 6px; }
+  .led .bx { position: absolute; border-radius: 8px; color: #000; font-weight: 700; font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: grab; box-shadow: inset 0 0 0 2px rgba(0,0,0,.18); transition: left .08s, top .08s, width .08s, height .08s; text-align: center; line-height: 1.2; overflow: hidden; }
+  .led .bx.drag { cursor: grabbing; transition: none; z-index: 3; opacity: .92; }
+  .led .bx.bad { box-shadow: 0 0 0 3px var(--red); opacity: .7; }
+  .led .bx .sz { font-size: 12px; font-weight: 500; opacity: .65; }
+  .led .bx .rs { position: absolute; right: 0; bottom: 0; width: 26px; height: 26px; cursor: nwse-resize; display: flex; align-items: flex-end; justify-content: flex-end; padding: 4px; }
+  .led .bx .rs::after { content: ""; width: 10px; height: 10px; border-right: 3px solid rgba(0,0,0,.55); border-bottom: 3px solid rgba(0,0,0,.55); border-radius: 0 0 3px 0; }
+  .led .bx .rm { position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border: 0; border-radius: 6px; background: rgba(0,0,0,.18); color: #000; font-size: 13px; line-height: 1; padding: 0; }
+  .ltray { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .ltray button { border: 0; border-radius: 99px; padding: 8px 14px; font-size: 14px; font-weight: 600; color: #000; }
 
   /* ---------- notification badges ---------- */
   .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -286,10 +327,10 @@
   <div class="sheet">
     <h2>Command Center settings</h2>
     <p>These stay on this Mac. Calendar links are private: anyone with one can read that calendar, so don't share them.</p>
-    <div class="fld"><label>Layout: pick what goes in each zone. Give a panel several zones to make it bigger (they must form a rectangle).</label></div>
-    <div class="zones" id="zonepick"></div>
-    <div class="zprev" id="zprev" aria-hidden="true"></div>
-    <div class="err" id="zerr" style="margin-top:8px"></div>
+    <div class="fld"><label>Layout: drag a tile to move it, drag its corner to resize. This box is the Edge: 8 across, 4 down.</label></div>
+    <div class="led" id="led"></div>
+    <div class="ltray" id="ltray"></div>
+    <div class="hint" id="zerr"></div>
     <div class="two" style="margin-top:14px">
       <div class="fld"><label for="musicSrc">Music</label><select id="musicSrc"><option value="spotify">Spotify</option><option value="apple">Apple Music</option></select></div>
       <div class="fld"><label for="aiSrc">AI assistant status</label><select id="aiSrc"><option value="claude">Claude</option><option value="openai">ChatGPT / OpenAI</option><option value="github">GitHub Copilot</option><option value="none">None</option></select></div>
@@ -349,21 +390,18 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp" };
 const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders" };
 const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942" };
-let layout = { zones: ["calendar", "messages", "music", "ai", "calendar", "messages", "music", "reminders"], music: "spotify", ai: "claude", aiTask: true };
-const panelOn = id => (layout.zones || []).includes(id);
-// The rectangle of zones a panel covers, or null if it isn't placed or isn't a rectangle
-function zoneBox(zones, id) {
-  const idx = zones.map((z, i) => z === id ? i : -1).filter(i => i >= 0);
-  if (!idx.length) return null;
-  const rows = idx.map(i => Math.floor(i / 4)), cols = idx.map(i => i % 4);
-  const r0 = Math.min(...rows), r1 = Math.max(...rows), c0 = Math.min(...cols), c1 = Math.max(...cols);
-  return { r0, r1, c0, c1, ok: (r1 - r0 + 1) * (c1 - c0 + 1) === idx.length };
-}
+const GW = 8, GH = 4;      // the Edge as a grid: 8 cells across, 4 down
+let layout = { boxes: { calendar: [0, 0, 2, 4], messages: [2, 0, 2, 4], music: [4, 0, 2, 4], ai: [6, 0, 2, 2], reminders: [6, 2, 2, 2] }, music: "spotify", ai: "claude", aiTask: true };
+const panelOn = id => !!(layout.boxes || {})[id];
 function applyLayout() {
   Object.keys(PANEL_EL).forEach(id => {
-    const el = $(PANEL_EL[id]), b = zoneBox(layout.zones || [], id);
-    el.classList.toggle("off", !(b && b.ok));
-    if (b && b.ok) { el.style.gridColumn = (b.c0 + 1) + " / " + (b.c1 + 2); el.style.gridRow = (b.r0 + 1) + " / " + (b.r1 + 2); }
+    const el = $(PANEL_EL[id]), b = (layout.boxes || {})[id];
+    el.classList.toggle("off", !b);
+    if (b) {
+      const [x, y, w, h] = b;
+      el.style.gridColumn = (x + 1) + " / span " + w; el.style.gridRow = (y + 1) + " / span " + h;
+      el.dataset.w = w; el.dataset.h = h;
+    }
   });
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
   loadBadges(); loadReminders(false);
@@ -1033,43 +1071,66 @@ function calRow(c, i) {
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
-let draftZones = [];
-function renderZonePicker() {
-  const box = $("zonepick"); box.innerHTML = "";
-  draftZones.forEach((z, i) => {
-    const d = document.createElement("div");
-    d.innerHTML = `<label for="z${i}">ZONE ${i + 1}</label><select id="z${i}"><option value="">(empty)</option>${Object.keys(PANEL_NAME).map(id => `<option value="${id}">${esc(PANEL_NAME[id])}</option>`).join("")}</select>`;
-    const sel = d.querySelector("select");
-    sel.value = z;
-    sel.onchange = () => { draftZones[i] = sel.value; renderZonePreview(); };
-    box.appendChild(d);
-  });
-  renderZonePreview();
+let draftBoxes = {};
+const cellsOf = ([x, y, w, h]) => { const c = []; for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) c.push(i + "," + j); return c; };
+function overlaps(id, b) {
+  const mine = new Set(cellsOf(b));
+  return Object.keys(draftBoxes).some(o => o !== id && cellsOf(draftBoxes[o]).some(c => mine.has(c)));
 }
-function zoneProblems() {
-  return Object.keys(PANEL_NAME).filter(id => { const b = zoneBox(draftZones, id); return b && !b.ok; });
+function boxStyle(el, [x, y, w, h]) {
+  el.style.left = `calc(${x * 100 / GW}% + 3px)`; el.style.top = `calc(${y * 100 / GH}% + 3px)`;
+  el.style.width = `calc(${w * 100 / GW}% - 6px)`; el.style.height = `calc(${h * 100 / GH}% - 6px)`;
+  const sz = el.querySelector(".sz"); if (sz) sz.textContent = w + " × " + h;
 }
-function renderZonePreview() {
-  const pv = $("zprev"); pv.innerHTML = "";
-  const bad = zoneProblems();
-  Object.keys(PANEL_NAME).forEach(id => {
-    const b = zoneBox(draftZones, id);
-    if (!b || !b.ok) return;
-    const d = document.createElement("div");
-    d.style.gridColumn = (b.c0 + 1) + " / " + (b.c1 + 2); d.style.gridRow = (b.r0 + 1) + " / " + (b.r1 + 2);
-    d.style.background = PANEL_COLOR[id]; d.textContent = PANEL_NAME[id];
-    pv.appendChild(d);
+function renderLayoutEditor() {
+  const led = $("led"); led.innerHTML = "";
+  for (let x = 0; x < GW; x++) for (let y = 0; y < GH; y++) {
+    const c = document.createElement("div"); c.className = "cell"; boxStyle(c, [x, y, 1, 1]); led.appendChild(c);
+  }
+  Object.keys(draftBoxes).forEach(id => {
+    const el = document.createElement("div"); el.className = "bx"; el.dataset.id = id;
+    el.style.background = PANEL_COLOR[id];
+    el.innerHTML = `<span>${esc(PANEL_NAME[id])}</span><span class="sz"></span><button class="rm" title="Remove ${esc(PANEL_NAME[id])}" aria-label="Remove ${esc(PANEL_NAME[id])}">✕</button><span class="rs" title="Drag to resize"></span>`;
+    boxStyle(el, draftBoxes[id]);
+    el.querySelector(".rm").onclick = e => { e.stopPropagation(); delete draftBoxes[id]; renderLayoutEditor(); };
+    el.querySelector(".rm").onpointerdown = e => e.stopPropagation();
+    el.onpointerdown = e => startDrag(e, el, id, e.target.classList.contains("rs") ? "resize" : "move");
+    led.appendChild(el);
   });
-  draftZones.forEach((z, i) => {
-    if (z && !bad.includes(z)) return;
-    const d = document.createElement("div"); d.className = "empty-z";
-    d.style.gridColumn = (i % 4 + 1) + ""; d.style.gridRow = (Math.floor(i / 4) + 1) + "";
-    d.textContent = z ? "?" : "empty";
-    pv.appendChild(d);
+  const tray = $("ltray"); tray.innerHTML = "";
+  const off = Object.keys(PANEL_NAME).filter(id => !draftBoxes[id]);
+  off.forEach(id => {
+    const b = document.createElement("button"); b.style.background = PANEL_COLOR[id]; b.textContent = "+ " + PANEL_NAME[id];
+    b.onclick = () => {
+      for (const [w, h] of [[2, 2], [2, 1], [1, 2], [1, 1]])
+        for (let y = 0; y + h <= GH; y++) for (let x = 0; x + w <= GW; x++)
+          if (!overlaps(id, [x, y, w, h])) { draftBoxes[id] = [x, y, w, h]; renderLayoutEditor(); return; }
+      $("zerr").textContent = "No empty space for " + PANEL_NAME[id] + ". Shrink or remove a tile first.";
+    };
+    tray.appendChild(b);
   });
-  $("zerr").textContent = bad.length ? bad.map(id => PANEL_NAME[id]).join(" and ") + (bad.length > 1 ? ": each panel's" : ":") + " zones need to form a rectangle (side by side, stacked, or a 2×2 block)." : "";
-  $("save").disabled = !!bad.length;
-  $("save").style.opacity = bad.length ? .4 : 1;
+  $("zerr").textContent = off.length ? "Tap a name above to add it back." : "";
+}
+function startDrag(e, el, id, mode) {
+  e.preventDefault();
+  const led = $("led"), r = led.getBoundingClientRect(), cw = r.width / GW, ch = r.height / GH;
+  const start = draftBoxes[id].slice(), sx = e.clientX, sy = e.clientY;
+  let cur = start;
+  el.classList.add("drag"); el.setPointerCapture(e.pointerId);
+  el.onpointermove = ev => {
+    const dx = Math.round((ev.clientX - sx) / cw), dy = Math.round((ev.clientY - sy) / ch);
+    let [x, y, w, h] = start;
+    if (mode === "move") { x = Math.max(0, Math.min(GW - w, x + dx)); y = Math.max(0, Math.min(GH - h, y + dy)); }
+    else { w = Math.max(1, Math.min(GW - x, w + dx)); h = Math.max(1, Math.min(GH - y, h + dy)); }
+    cur = [x, y, w, h];
+    boxStyle(el, cur);
+    el.classList.toggle("bad", overlaps(id, cur));
+  };
+  el.onpointerup = el.onpointercancel = () => {
+    el.onpointermove = el.onpointerup = el.onpointercancel = null;
+    if (!overlaps(id, cur)) draftBoxes[id] = cur;
+    renderLayoutEditor();
+  };
 }
 const BADGE_HELP = {
   "Gmail": `Needs Gmail installed as a Chrome app plus the badge extension. <a href="https://chromewebstore.google.com/detail/gmail-app-badge-notificat/fbaolhbfbmniffcokakochjjeccpcpkh" target="_blank" rel="noopener">Get the extension</a>, then in Gmail: ⋮ → Cast, save and share → Install page as app.`,
@@ -1157,9 +1218,8 @@ function collectOverrides() {
   return out;
 }
 async function openSetup() {
-  draftZones = (layout.zones || []).slice(0, 8);
-  while (draftZones.length < 8) draftZones.push("");
-  renderZonePicker();
+  draftBoxes = JSON.parse(JSON.stringify(layout.boxes || {}));
+  renderLayoutEditor();
   $("musicSrc").value = layout.music; $("musicSrc").onchange();
   $("aiSrc").value = layout.ai;
   $("aiTask").checked = !!layout.aiTask;
@@ -1221,8 +1281,7 @@ $("save").onclick = async () => {
     color: r.querySelector(".cc").value,
     url: r.querySelector(".cu").value.trim() || (r.dataset.has ? "__keep__" : "")
   })).filter(c => c.url);
-  if (zoneProblems().length) return;
-  const newLayout = { zones: draftZones.slice(), music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
+  const newLayout = { boxes: JSON.parse(JSON.stringify(draftBoxes)), music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
     const body = { calendars: cals, layout: newLayout, prefs: newPrefs };
     if (document.querySelector("#namerows input[data-key]")) {

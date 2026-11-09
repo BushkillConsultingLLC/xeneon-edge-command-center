@@ -15,19 +15,9 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 | **Reminders** | Your open **Apple Reminders** across all lists: flagged and overdue first, then today, then upcoming. Tap the circle to check one off; it syncs to your iPhone like any other change. |
 | **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
 
-**Pick what you see.** The Edge is divided into **8 zones**, four across the top and four across the bottom:
+**Pick what you see.** The Edge is laid out as a grid, **8 cells across and 4 down**. In settings, drag a tile to move it and drag its corner to resize it, anywhere from 1 × 1 up to the whole screen. Tiles can't overlap: a move that would land on another tile turns red and snaps back. Remove a tile with ✕ and add it back from the list underneath. Every panel has compact versions for one-row and one-column tiles. Layouts from older versions (8 zones) are converted automatically.
 
-```
- ┌───┬───┬───┬───┐
- │ 1 │ 2 │ 3 │ 4 │
- ├───┼───┼───┼───┤
- │ 5 │ 6 │ 7 │ 8 │
- └───┴───┴───┴───┘
-```
-
-Choose a panel for each zone. Give a panel several zones to make it bigger: zones 1 and 2 make a wide block, 4 and 8 a tall column, 1, 2, 5 and 6 a big square. A panel's zones must form a rectangle, and settings show a live preview and flag anything that doesn't. Every panel has a compact version for half-height zones.
-
-![Example layout: Now Playing across zones 1-2, Calendar in 3, Messages down 4 and 8, then Notifications, Reminders and Claude](docs/layout-example.png)
+![The layout editor: Calendar 2 × 4, Notifications 2 × 1 above Messages 2 × 3, Music 4 × 2, Reminders 2 × 2 and Claude 1 × 2](docs/layout-example.png)
 
  Tap the ⚙︎ in the bottom-right corner of the Edge and settings open in your normal browser **on your main monitor**, where typing works properly. Save, and the Edge updates within a few seconds. (You can also open `http://127.0.0.1:8888/?settings` directly.)
 
@@ -149,6 +139,7 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | Apple Music says "Allow Terminal to control Music" | *System Settings → Privacy & Security → Automation → Terminal →* turn on **Music**. |
 | The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
 | Notification tiles all say 0 | Allow Terminal under *Privacy & Security → Accessibility*, then restart. A tile can only show what the app's Dock icon shows: if the icon has no red badge, neither will the tile. |
+| A blocked or junk sender still shows in Messages | The dashboard skips blocked conversations and anything Messages filed as Junk. For anyone else, tick **Hide** next to them under *Names in Messages* in settings. |
 | Mail or Gmail tile says 0 with no Dock badge | The dashboard falls back to asking Mail for its unread count (allow Terminal to control Mail when macOS asks) and to reading the count in the Gmail window title ("Inbox (3)"). |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
 

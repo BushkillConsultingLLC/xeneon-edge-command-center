@@ -214,6 +214,8 @@ def recent_messages(limit=12, include_hidden=False):
         msg_cols = {r[1] for r in con.execute("PRAGMA table_info(message)")}
         if "is_blackholed" in chat_cols:
             not_deleted += " AND COALESCE(c.is_blackholed, 0) = 0"
+        if "is_filtered" in chat_cols:      # 2 = Messages put the chat in Junk
+            not_deleted += " AND COALESCE(c.is_filtered, 0) != 2"
         if "is_spam" in msg_cols:
             not_deleted += " AND COALESCE(m.is_spam, 0) = 0"
         _msg_debug(con, chat_cols)
@@ -349,11 +351,12 @@ def open_meeting(url):
 
 # ---------------- layout (which panels, which services) ----------------
 PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders")
-# The Edge is split into 8 zones: 1-4 across the top, 5-8 across the bottom.
-# A panel may take several zones as long as they form a rectangle.
+# Older versions split the Edge into 8 zones: 1-4 across the top, 5-8 across the bottom.
+GRID_W, GRID_H = 8, 4
+# Each panel gets a box on an 8 x 4 grid: [x, y, width, height] in cells.
 DEFAULT_LAYOUT = {
-    "zones": ["calendar", "messages", "music", "ai",
-              "calendar", "messages", "music", "reminders"],
+    "boxes": {"calendar": [0, 0, 2, 4], "messages": [2, 0, 2, 4], "music": [4, 0, 2, 4],
+              "ai": [6, 0, 2, 2], "reminders": [6, 2, 2, 2]},
     "music": "spotify",      # spotify | apple
     "ai": "claude",          # claude | openai | github | none
     "aiTask": True,          # show the "what it's working on" card
@@ -371,6 +374,39 @@ def clean_zones(zones):
         if area != len(idx):
             z = [("" if x == pid else x) for x in z]
     return z
+
+
+def clean_boxes(boxes):
+    """Keep boxes that are inside the grid and don't overlap an earlier one."""
+    out, taken = {}, set()
+    for pid in PANEL_IDS:
+        b = boxes.get(pid)
+        if not isinstance(b, (list, tuple)) or len(b) != 4:
+            continue
+        try:
+            x, y, w, h = (int(v) for v in b)
+        except (TypeError, ValueError):
+            continue
+        if w < 1 or h < 1 or x < 0 or y < 0 or x + w > GRID_W or y + h > GRID_H:
+            continue
+        cells = {(cx, cy) for cx in range(x, x + w) for cy in range(y, y + h)}
+        if cells & taken:
+            continue
+        taken |= cells
+        out[pid] = [x, y, w, h]
+    return out
+
+
+def boxes_from_zones(zones):
+    """The old layout had 4 x 2 zones; each zone is 2 x 2 cells on the new grid."""
+    z = clean_zones(zones)
+    out = {}
+    for pid in set(x for x in z if x):
+        idx = [i for i, x in enumerate(z) if x == pid]
+        c0, c1 = min(i % 4 for i in idx), max(i % 4 for i in idx)
+        r0, r1 = min(i // 4 for i in idx), max(i // 4 for i in idx)
+        out[pid] = [c0 * 2, r0 * 2, (c1 - c0 + 1) * 2, (r1 - r0 + 1) * 2]
+    return clean_boxes(out)
 
 
 def zones_from_panels(panels):
@@ -442,10 +478,12 @@ def get_prefs():
 def get_layout():
     lay = load_config().get("layout") or {}
     out = json.loads(json.dumps(DEFAULT_LAYOUT))
-    if isinstance(lay.get("zones"), list):
-        out["zones"] = clean_zones(lay["zones"])
+    if isinstance(lay.get("boxes"), dict):
+        out["boxes"] = clean_boxes(lay["boxes"])
+    elif isinstance(lay.get("zones"), list):
+        out["boxes"] = boxes_from_zones(lay["zones"])
     elif isinstance(lay.get("panels"), list):
-        out["zones"] = zones_from_panels(lay["panels"])
+        out["boxes"] = boxes_from_zones(zones_from_panels(lay["panels"]))
     if lay.get("music") in ("spotify", "apple"):
         out["music"] = lay["music"]
     if lay.get("ai") in ("claude", "openai", "github", "none"):
