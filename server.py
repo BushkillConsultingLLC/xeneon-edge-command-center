@@ -125,7 +125,35 @@ def text_from_attributed(blob):
         return ""
 
 
-_blocked = {"t": 0, "set": set()}
+_blocked = {"t": 0, "set": set(), "n": 0}
+_mdebug = {"t": 0}
+
+
+def _msg_debug(con, chat_cols):
+    """Local-only troubleshooting note: which senders are recent and how Messages flags their chats."""
+    if time.time() - _mdebug["t"] < 60:
+        return
+    _mdebug["t"] = time.time()
+    try:
+        flags = [c for c in ("service_name", "is_blackholed", "is_filtered", "is_archived", "is_recovered") if c in chat_cols]
+        sel = ", ".join("c." + c for c in flags) or "''"
+        rows = con.execute("""SELECT DISTINCT h.id, '', %s FROM message m
+            JOIN chat_message_join cmj ON cmj.message_id = m.ROWID JOIN chat c ON c.ROWID = cmj.chat_id
+            LEFT JOIN handle h ON h.ROWID = m.handle_id WHERE m.is_from_me = 0
+            ORDER BY m.date DESC LIMIT 25""" % sel).fetchall()
+        b = blocked_handles()
+        with open(os.path.join(ROOT, "messages-debug.txt"), "w") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\nblock list entries: %d (short ones: %s)\nflags: %s\n"
+                    % (len(b), sorted(k for k in b if len(k) < 7), flags))
+            for r in rows:
+                k = norm_handle(r[0])
+                f.write("%s\t%s\t%s\tblocked=%s\n" % (k if len(k) < 7 else "..." + k[-4:], r[1], r[2:], k in b))
+    except Exception as e:
+        try:
+            with open(os.path.join(ROOT, "messages-debug.txt"), "w") as f:
+                f.write("debug error: %s\n" % e)
+        except Exception:
+            pass
 
 
 def blocked_handles():
@@ -167,7 +195,7 @@ def blocked_handles():
     return found
 
 
-def recent_messages(limit=12):
+def recent_messages(limit=12, include_hidden=False):
     if not os.path.exists(CHAT_DB):
         return {"ok": False, "error": "no_db"}
     try:
@@ -188,6 +216,7 @@ def recent_messages(limit=12):
             not_deleted += " AND COALESCE(c.is_blackholed, 0) = 0"
         if "is_spam" in msg_cols:
             not_deleted += " AND COALESCE(m.is_spam, 0) = 0"
+        _msg_debug(con, chat_cols)
         rows = con.execute("""
             SELECT m.ROWID, m.date, m.text, m.attributedBody, h.id,
                    c.display_name, c.chat_identifier, m.is_read,
@@ -210,11 +239,14 @@ def recent_messages(limit=12):
     name_style = get_prefs().get("msgNames", "full")
     overrides = load_config().get("nameOverrides") or {}
     blocked = blocked_handles()
+    hidden = set(load_config().get("hiddenSenders") or [])
     out, seen = [], set()
     for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att in rows:
         if rowid in seen:
             continue
         if norm_handle(handle) in blocked or (not group_name and norm_handle(chat_id) in blocked):
+            continue
+        if not include_hidden and norm_handle(handle) in hidden:
             continue
         seen.add(rowid)
         body = text or text_from_attributed(attr)
@@ -243,6 +275,7 @@ def recent_messages(limit=12):
             "text": body[:400],
             "time": int(unix * 1000),
             "unread": not is_read,
+            "hidden": norm_handle(handle) in hidden,
         })
         if len(out) >= limit:
             break
@@ -841,16 +874,19 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/reminders":
             return self._json(reminders(force=parse_qs(u.query).get("force") == ["1"]))
         if p == "/api/senders":
-            d = recent_messages(limit=60)
-            ov = load_config().get("nameOverrides") or {}
+            d = recent_messages(limit=60, include_hidden=True)
+            cfg = load_config()
+            ov = cfg.get("nameOverrides") or {}
+            hid = cfg.get("hiddenSenders") or []
             seen, out = set(), []
             for m in d.get("messages", []):
                 if m["key"] and m["key"] not in seen:
                     seen.add(m["key"])
-                    out.append({"key": m["key"], "card": m["card"], "override": ov.get(m["key"], "")})
-            for k, v in ov.items():            # keep overrides for people who haven't texted lately
+                    out.append({"key": m["key"], "card": m["card"], "override": ov.get(m["key"], ""), "hidden": m["key"] in hid})
+            for k in list(ov) + list(hid):     # keep people who haven't texted lately
                 if k not in seen:
-                    out.append({"key": k, "card": "", "override": v})
+                    seen.add(k)
+                    out.append({"key": k, "card": "", "override": ov.get(k, ""), "hidden": k in hid})
             return self._json({"ok": d.get("ok", False), "senders": out[:20]})
         if p == "/api/claude":
             try:
@@ -966,6 +1002,8 @@ class Handler(SimpleHTTPRequestHandler):
                     if k and v:
                         ov[k] = v
                 cfg["nameOverrides"] = ov
+            if isinstance(body.get("hiddenSenders"), list):
+                cfg["hiddenSenders"] = sorted({norm_handle(str(k)[:120]) for k in body["hiddenSenders"][:200] if str(k).strip()} - {""})
             if isinstance(body.get("layout"), dict):
                 cfg["layout"] = body["layout"]
                 save_config(cfg)

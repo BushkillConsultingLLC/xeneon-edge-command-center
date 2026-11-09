@@ -204,8 +204,10 @@
   .prow { display: grid; grid-template-columns: 34px 1fr 150px 48px 48px; gap: 10px; align-items: center; margin-bottom: 8px; font-size: 16px; }
   .prow input[type=checkbox], .chk input { width: 22px; height: 22px; accent-color: var(--green); }
   .sheet select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 10px 12px; font-size: 15px; width: 100%; }
-  .nrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
-  .nrow input { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 12px; font-size: 15px; width: 100%; }
+  .nrow { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
+  .nrow .hide { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+  .nrow .hide input { width: 20px; height: 20px; padding: 0; }
+  .nrow input:not([type]) { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 12px; font-size: 15px; width: 100%; }
   .brow { display: grid; grid-template-columns: 30px 190px 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
   .brow input { width: 22px; height: 22px; accent-color: var(--green); }
   .brow .st { font-size: 13px; color: var(--muted); }
@@ -301,7 +303,7 @@
       <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
       <hr>
     </div>
-    <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it)</label></div>
+    <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it, or tick Hide to keep a sender off the Edge)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
     <div class="fld"><label>Notifications panel: apps to count</label></div>
     <div id="badgerows" class="hint">Loading…</div>
@@ -1141,8 +1143,9 @@ async function loadNameRows() {
   d.senders.forEach(x => {
     const r = document.createElement("div"); r.className = "nrow";
     r.innerHTML = `<span>${esc(x.card || maskKey(x.key))}${x.card ? `<span class="hint" style="margin-left:8px">${esc(maskKey(x.key))}</span>` : ""}</span>
-      <input placeholder="Show as… (leave empty to use the card)" aria-label="Show ${esc(x.card || x.key)} as">`;
-    const inp = r.querySelector("input");
+      <input placeholder="Show as… (leave empty to use the card)" aria-label="Show ${esc(x.card || x.key)} as">
+      <label class="hide"><input type="checkbox" data-hide="${esc(x.key)}" ${x.hidden ? "checked" : ""}>Hide</label>`;
+    const inp = r.querySelector("input:not([type])");
     inp.value = x.override || "";
     inp.dataset.key = x.key;
     box.appendChild(r);
@@ -1222,7 +1225,10 @@ $("save").onclick = async () => {
   const newLayout = { zones: draftZones.slice(), music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
     const body = { calendars: cals, layout: newLayout, prefs: newPrefs };
-    if (document.querySelector("#namerows input[data-key]")) body.nameOverrides = collectOverrides();
+    if (document.querySelector("#namerows input[data-key]")) {
+      body.nameOverrides = collectOverrides();
+      body.hiddenSenders = [...document.querySelectorAll("#namerows input[data-hide]:checked")].map(i => i.dataset.hide);
+    }
     const r = await postConfig(body);
     cfgRev = r.rev != null ? r.rev : cfgRev;
   } catch (e) { layout = newLayout; }
