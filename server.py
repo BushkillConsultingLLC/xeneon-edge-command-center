@@ -13,6 +13,8 @@ import re
 import sqlite3
 import subprocess
 import time
+import uuid
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -351,7 +353,7 @@ def open_meeting(url):
 
 
 # ---------------- layout (which panels, which services) ----------------
-PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders", "weather", "actions")
+PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders", "weather", "actions", "lights")
 # Older versions split the Edge into 8 zones: 1-4 across the top, 5-8 across the bottom.
 GRID_W, GRID_H = 8, 4
 # Each panel gets a box on an 8 x 4 grid: [x, y, width, height] in cells.
@@ -499,7 +501,7 @@ DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscree
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
                  "calSource": "links", "hiddenCals": [], "tiles": {}, "hiddenRemLists": [],
                  "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
-                 "actions": DEFAULT_ACTIONS}
+                 "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}}
 
 
 def get_prefs():
@@ -538,6 +540,11 @@ def get_prefs():
                                 "units": "c" if w.get("units") == "c" else "f"}
         except (TypeError, ValueError):
             p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
+    lt = saved.get("lights")
+    if isinstance(lt, dict):
+        rooms = lt.get("rooms") if isinstance(lt.get("rooms"), dict) else {}
+        p["lights"] = {"hidden": [str(x)[:80] for x in (lt.get("hidden") or [])][:100],
+                       "rooms": {str(k)[:80]: str(v).strip()[:30] for k, v in list(rooms.items())[:100] if str(v).strip()}}
     if isinstance(saved.get("actions"), list):
         p["actions"] = [a for a in (clean_action(x) for x in saved["actions"][:16]) if a]
     if saved.get("calSource") in ("links", "apple", "both"):
@@ -709,7 +716,10 @@ def dock_badges():
 _unread_memo = {}
 
 
-def unread_fallback(name):
+_fallback_debug = {}
+
+
+def unread_fallback(name, dock_names=()):
     """When an app shows no Dock badge, ask it another way.
     Mail: its own unread count for every inbox (asks once for Automation permission).
     Web apps like Gmail: the count in the window title, e.g. "Inbox (3) - ... - Gmail"."""
@@ -719,13 +729,15 @@ def unread_fallback(name):
             return "" if out.strip() == "0" else out.strip()
         return None
     procs = [name] + (["Google Chrome"] if name == "Gmail" else [])
-    out = ""
+    # minimized windows show up as Dock items named after the window, e.g. "Gmail - Inbox (3) - you@gmail.com - Gmail"
+    out = "\n".join(n for n in dock_names if "Inbox" in n and (name == "Gmail" or name in n))
     for proc in procs:
         proc = proc.replace('"', '')
         ok, o, _ = osa('tell application "System Events" to if exists process "%s" then return name of every window of process "%s"'
                        % (proc, proc), timeout=3)
         if ok:
             out += "\n" + o
+        _fallback_debug[name + "/" + proc] = (o if ok else "error")[:300]
     if name == "Gmail":
         # only personal Gmail windows ("Inbox (3) - you@gmail.com - Gmail"), not Workspace accounts
         out = "\n".join(re.findall(r"Inbox[^,\n]*?@(?:gmail|googlemail)\.com", out))
@@ -755,7 +767,7 @@ def badges():
         running = bool(_lsappinfo(["find", "name=" + name]).strip()) or bool(labels and labels.get(name))
         label = (labels or {}).get(name, "") if running else ""
         if running and not label:
-            alt = unread_fallback(name)
+            alt = unread_fallback(name, list((labels or {}).keys()))
             if alt:
                 label = alt
         title = (get_prefs()["tiles"].get(name) or {}).get("label") or ""
@@ -765,7 +777,7 @@ def badges():
         try:
             with open(os.path.join(ROOT, "badge-debug.txt"), "w") as f:
                 f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + ("dock error: " + err[:300] if labels is None else "dock: " + repr(labels)[:1500])
-                        + "\nresult: " + json.dumps(out) + "\n")
+                        + "\nresult: " + json.dumps(out) + "\nwindow checks: " + json.dumps(_fallback_debug)[:1500] + "\n")
         except Exception:
             pass
     return {"ok": True, "apps": out, "note": note}
@@ -822,6 +834,135 @@ def geocode(q):
         label = ", ".join(x for x in (r.get("name"), r.get("admin1"), r.get("country_code")) if x)
         res.append({"name": label, "lat": r.get("latitude"), "lon": r.get("longitude")})
     return {"ok": True, "results": res}
+
+
+# ---------------- Govee lights (official Govee developer API; key from the Govee Home app) ----------------
+GOVEE = os.environ.get("CC_GOVEE_API", "https://openapi.api.govee.com/router/api/v1")
+_govee = {"devices": None, "dt": 0, "states": {}, "err": ""}
+
+
+def _govee_call(method, path, payload=None, timeout=8):
+    key = load_config().get("goveeKey")
+    if not key:
+        raise RuntimeError("no_key")
+    data = None if payload is None else json.dumps({"requestId": str(uuid.uuid4()), "payload": payload}).encode()
+    req = urllib.request.Request(GOVEE + path, data=data, method=method,
+                                 headers={"Govee-API-Key": key, "Content-Type": "application/json",
+                                          "User-Agent": "XeneonEdgeCommandCenter/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read(2_000_000))
+    except urllib.error.HTTPError as e:
+        raise RuntimeError({401: "bad_key", 403: "bad_key", 429: "rate"}.get(e.code, "http_%d" % e.code))
+
+
+def govee_devices(force=False):
+    if not force and _govee["devices"] is not None and time.time() - _govee["dt"] < 3600:
+        return _govee["devices"]
+    d = _govee_call("GET", "/user/devices")
+    out = []
+    for x in d.get("data") or []:
+        caps = {c.get("instance") for c in x.get("capabilities") or []}
+        if "powerSwitch" not in caps:
+            continue                      # sensors, kettles etc.: only things that switch on and off
+        out.append({"sku": x.get("sku", ""), "device": x.get("device", ""), "name": x.get("deviceName") or x.get("sku", "Light"),
+                    "dim": "brightness" in caps})
+    _govee["devices"], _govee["dt"] = out, time.time()
+    return out
+
+
+def govee_state(dev, max_age=180):
+    st = _govee["states"].get(dev["device"])
+    if st and time.time() - st["t"] < max_age:
+        return st
+    try:
+        d = _govee_call("POST", "/device/state", {"sku": dev["sku"], "device": dev["device"]})
+        st = {"t": time.time(), "online": None, "on": None, "bright": None}
+        for c in (d.get("payload") or {}).get("capabilities") or []:
+            v = (c.get("state") or {}).get("value")
+            if c.get("instance") == "online":
+                st["online"] = bool(v) if v != "" else None
+            elif c.get("instance") == "powerSwitch" and v != "":
+                st["on"] = v == 1
+            elif c.get("instance") == "brightness" and isinstance(v, (int, float)):
+                st["bright"] = int(v)
+    except Exception:
+        st = dict(st or {"online": None, "on": None, "bright": None}, t=time.time() - max_age + 30)
+    _govee["states"][dev["device"]] = st
+    return st
+
+
+def _rooms():
+    """Lights grouped into rooms: devices given the same room name in settings share one button."""
+    lp = get_prefs()["lights"]
+    hidden, names = set(lp["hidden"]), lp["rooms"]
+    rooms = {}
+    for dev in govee_devices():
+        if dev["device"] in hidden:
+            continue
+        rooms.setdefault(names.get(dev["device"]) or dev["name"], []).append(dev)
+    return rooms
+
+
+def lights_view(show_all=False):
+    try:
+        if show_all:
+            lp = get_prefs()["lights"]
+            return {"ok": True, "devices": [dict(d, room=lp["rooms"].get(d["device"], ""), hidden=d["device"] in lp["hidden"])
+                                            for d in govee_devices(force=True)]}
+        rooms = _rooms()
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+    # refresh stale states in parallel (Govee allows 30 state checks a minute per light)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        list(ex.map(govee_state, [d for devs in rooms.values() for d in devs]))
+    out = []
+    for name, devs in rooms.items():
+        sts = [govee_state(d) for d in devs]
+        ons = [s["on"] for s in sts if s["on"] is not None]
+        brs = [s["bright"] for s, d in zip(sts, devs) if s["bright"] is not None and s["on"]]
+        out.append({"name": name, "count": len(devs), "on": (any(ons) if ons else None),
+                    "bright": (round(sum(brs) / len(brs)) if brs else None), "dim": any(d["dim"] for d in devs),
+                    "offline": all(s["online"] is False for s in sts)})
+    return {"ok": True, "rooms": out}
+
+
+def lights_control(room, action, value=None):
+    try:
+        rooms = _rooms()
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+    if action == "all-off":
+        targets = [d for devs in rooms.values() for d in devs]
+        action = "off"
+    else:
+        targets = rooms.get(room) or []
+    if not targets:
+        return {"ok": False, "error": "unknown_room"}
+    if action == "toggle":
+        sts = [govee_state(d) for d in targets]
+        action = "off" if any(s["on"] for s in sts) else "on"
+    errs = 0
+    for d in targets:
+        if action in ("on", "off"):
+            cap = {"type": "devices.capabilities.on_off", "instance": "powerSwitch", "value": 1 if action == "on" else 0}
+        elif action == "brightness" and d["dim"]:
+            cap = {"type": "devices.capabilities.range", "instance": "brightness", "value": max(1, min(100, int(value or 50)))}
+        else:
+            continue
+        try:
+            _govee_call("POST", "/device/control", {"sku": d["sku"], "device": d["device"], "capability": cap})
+            st = _govee["states"].setdefault(d["device"], {"online": True, "on": None, "bright": None})
+            st["t"] = time.time()            # trust what we just sent; re-check on the normal schedule
+            if action == "brightness":
+                st["on"], st["bright"] = True, cap["value"]
+            else:
+                st["on"] = action == "on"
+        except Exception as e:
+            errs += 1
+            err = str(e)[:60]
+    return {"ok": errs == 0, "error": err if errs else ""}
 
 
 # ---------------- Apple Reminders (read with AppleScript, no account needed) ----------------
@@ -1012,7 +1153,7 @@ class Handler(SimpleHTTPRequestHandler):
             cals = [{"name": c.get("name", ""), "color": c.get("color", ""),
                      "hasUrl": bool(c.get("url"))} for c in cfg.get("calendars", [])]
             return self._json({"calendars": cals, "layout": get_layout(), "prefs": get_prefs(),
-                               "rev": int(cfg.get("rev", 0))})
+                               "hasGoveeKey": bool(cfg.get("goveeKey")), "rev": int(cfg.get("rev", 0))})
         if p == "/api/music":
             return self._json(music_state())
         if p == "/api/music/art":
@@ -1056,6 +1197,8 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/reminders":
             q = parse_qs(u.query)
             return self._json(reminders_shown(force=q.get("force") == ["1"], show_all=q.get("all") == ["1"]))
+        if p == "/api/lights":
+            return self._json(lights_view(show_all=parse_qs(u.query).get("all") == ["1"]))
         if p == "/api/weather":
             return self._json(weather(force=parse_qs(u.query).get("force") == ["1"]))
         if p == "/api/geocode":
@@ -1158,6 +1301,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json({"ok": complete_reminder(str(body.get("id", "")))})
             except Exception as e:
                 return self._json({"ok": False, "error": str(e)}, 400)
+        if p == "/api/lights":
+            try:
+                n = int(self.headers.get("Content-Length", "0"))
+                body = json.loads(self.rfile.read(min(n, 2000)) or b"{}")
+                return self._json(lights_control(str(body.get("room", "")), str(body.get("action", "")), body.get("value")))
+            except Exception as e:
+                return self._json({"ok": False, "error": str(e)[:200]}, 400)
         if p == "/api/music":
             try:
                 n = int(self.headers.get("Content-Length", "0"))
@@ -1195,6 +1345,14 @@ class Handler(SimpleHTTPRequestHandler):
                     if k and v:
                         ov[k] = v
                 cfg["nameOverrides"] = ov
+            if isinstance(body.get("goveeKey"), str) and body["goveeKey"].strip():
+                k = body["goveeKey"].strip()
+                if k == "__clear__":
+                    cfg.pop("goveeKey", None)
+                elif re.fullmatch(r"[A-Za-z0-9-]{8,80}", k):
+                    cfg["goveeKey"] = k
+                _govee["devices"] = None
+                _govee["states"] = {}
             if isinstance(body.get("hiddenSenders"), list):
                 cfg["hiddenSenders"] = sorted({norm_handle(str(k)[:120]) for k in body["hiddenSenders"][:200] if str(k).strip()} - {""})
             if isinstance(body.get("layout"), dict):
@@ -1204,7 +1362,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

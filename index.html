@@ -141,9 +141,38 @@
   #actp[data-h="1"] .label { display: none; }
   .arow { display: grid; grid-template-columns: 64px 1fr 130px 1.4fr 40px; gap: 8px; margin-bottom: 8px; }
   .arow input, .arow select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 10px; font-size: 15px; width: 100%; }
-  .arow input.ic { text-align: center; font-size: 18px; }
+  .arow input.ic { text-align: center; font-size: 20px; cursor: pointer; caret-color: transparent; }
+  .icpick { position: absolute; z-index: 50; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.5); width: 372px; }
+  .icpick .g { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+  .icpick button { background: none; border: 0; border-radius: 8px; font-size: 22px; padding: 5px 0; }
+  .icpick button:hover, .icpick button:focus { background: var(--panel2); outline: none; }
+  .icpick .h { font-size: 11px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin: 8px 2px 4px; }
+  .icpick .h:first-child { margin-top: 0; }
+  .icpick .own { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
   .wxres { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   .wxres button { background: var(--panel2); border: 1px solid var(--line); border-radius: 99px; color: var(--fg); padding: 7px 12px; font-size: 14px; }
+
+  /* ---------- lights ---------- */
+  .alloff { background: var(--panel2); border: 0; border-radius: 99px; color: var(--fg); font-size: 12px; letter-spacing: .04em; padding: 5px 12px; min-height: 30px; text-transform: none; font-weight: 600; }
+  .alloff:active { background: var(--line); }
+  .lts { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); grid-auto-rows: minmax(70px, 1fr); gap: 10px; margin-top: 12px; min-height: 0; overflow: hidden; }
+  .lt { position: relative; background: var(--panel2); border: 0; border-radius: 14px; padding: 10px 12px 18px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; color: var(--fg); min-height: 0; overflow: hidden; touch-action: none; }
+  .lt .ln { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .lt .ls { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .lt.on { background: #3a3220; box-shadow: inset 0 0 0 2px #ffd166; }
+  .lt.on .ls { color: #ffd166; }
+  .lt.off .ln::before { content: ""; }
+  .lt.offline { opacity: .45; }
+  .lt .lb { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: rgba(255,255,255,.06); }
+  .lt .lb i { display: block; height: 100%; background: #ffd166; opacity: .8; }
+  .lt.off .lb i { opacity: .25; }
+  .lt:active { transform: scale(.97); }
+  .panel[data-h="1"] .lts { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-template-rows: 1fr; grid-auto-rows: 1fr; margin-top: 6px; gap: 6px; }
+  .panel[data-h="1"] .lt { padding: 4px 10px 12px; } .panel[data-h="1"] .lt .ln { font-size: 14px; } .panel[data-h="1"] .lt .ls { font-size: 11px; margin-top: 1px; }
+  .panel[data-h="1"] .lt .lb { height: 8px; }
+  .lrow { display: grid; grid-template-columns: 30px 1fr 1fr; gap: 10px; align-items: center; margin-bottom: 6px; font-size: 15px; color: var(--fg); }
+  .lrow input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--green); }
+  .lrow input:not([type]) { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 8px 12px; font-size: 15px; width: 100%; }
 
   /* ---------- one-row tiles (a quarter of the Edge's height) ---------- */
   .panel[data-h="1"] { padding: 12px 16px; }
@@ -360,6 +389,12 @@
     <div class="acts" id="acts"></div>
   </section>
 
+  <!-- LIGHTS -->
+  <section class="panel" id="lightp">
+    <div class="label">Lights<span class="sp"></span><span id="lightmsg" style="color:var(--amber);text-transform:none;letter-spacing:0;font-weight:500"></span><button class="alloff" id="alloff">All off</button></div>
+    <div class="lts" id="lts"><div class="empty">Loading…</div></div>
+  </section>
+
   <!-- CLAUDE -->
   <section class="panel" id="cl">
     <div class="label" id="ailabel"><span style="color:var(--claude)">✳︎</span> Claude</div>
@@ -402,6 +437,11 @@
     <div id="actrows"></div>
     <button class="ghost" id="addAct" type="button">+ Add a button</button>
     <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients.</div>
+    <hr>
+    <div class="fld"><label for="goveeKey">Lights: Govee API key</label>
+      <input id="goveeKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the key Govee emailed you">
+      <div class="hint">Get a free key in the Govee Home app: Profile → ⚙︎ Settings → Apply for API Key. Govee emails it to you. It's stored only on this Mac.</div></div>
+    <div id="lightrows" class="hint" style="margin:0 0 10px"></div>
     <hr>
     <div class="fld"><label>Reminders: lists to show</label></div>
     <div id="remrows" class="hint" style="margin:0 0 10px">Loading lists…</div>
@@ -449,9 +489,9 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 /* =========================================================
    LAYOUT (which panels show, how wide, in what order)
    ========================================================= */
-const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp", weather: "wxp", actions: "actp" };
-const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders", weather: "Weather", actions: "Quick Actions" };
-const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942", weather: "#4dd0e1", actions: "#b0bec5" };
+const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp", weather: "wxp", actions: "actp", lights: "lightp" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders", weather: "Weather", actions: "Quick Actions", lights: "Lights" };
+const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942", weather: "#4dd0e1", actions: "#b0bec5", lights: "#ffd166" };
 const GW = 8, GH = 4;      // the Edge as a grid: 8 cells across, 4 down
 let layout = { boxes: { calendar: [0, 0, 2, 4], messages: [2, 0, 2, 4], music: [4, 0, 2, 4], ai: [6, 0, 2, 2], reminders: [6, 2, 2, 2] }, music: "spotify", ai: "claude", aiTask: true };
 const panelOn = id => !!(layout.boxes || {})[id];
@@ -466,18 +506,20 @@ function applyLayout() {
     }
   });
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
-  loadBadges(); loadReminders(false); loadWeather(); renderActions();
+  loadBadges(); loadReminders(false); loadWeather(); renderActions(); loadLights();
   applyAi();
   applyMusicMode();
 }
 let prefs = { spotifyClientId: "", speaker: "office speakers", fullscreen: true, spotifyReset: 0 };
 let cfgRev = -1;
+let hasGovee = false;
 const SETTINGS_PAGE = new URLSearchParams(location.search).has("settings");
 async function loadLayout() {
   try {
     const c = await (await fetch("/api/config")).json();
     if (c.layout) layout = c.layout;
     if (c.prefs) prefs = c.prefs;
+    hasGovee = !!c.hasGoveeKey;
     cfgRev = c.rev || 0;
     // one-time move of settings that older versions kept only in this window
     const oldCid = store.get("spotify" + "ClientId", "");
@@ -503,7 +545,7 @@ async function watchConfig() {
     const c = await (await fetch("/api/config")).json();
     if (cfgRev >= 0 && c.rev !== cfgRev) {
       const oldCid = prefs.spotifyClientId;
-      layout = c.layout || layout; prefs = c.prefs || prefs; cfgRev = c.rev;
+      layout = c.layout || layout; prefs = c.prefs || prefs; cfgRev = c.rev; hasGovee = !!c.hasGoveeKey;
       if (oldCid !== prefs.spotifyClientId || String(prefs.spotifyReset || 0) !== store.get("spReset", "0")) {
         ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
         store.set("spReset", String(prefs.spotifyReset || 0));
@@ -1197,6 +1239,86 @@ function renderActions() {
   box.querySelectorAll(".act").forEach(b => b.onclick = () => macOpen({ kind: "action", i: +b.dataset.i }, b));
 }
 
+/* =========================================================
+   LIGHTS (Govee, through the local server)
+   ========================================================= */
+let lightsData = [], lightsBusy = 0, lightsLast = 0;
+const LIGHT_ERR = { no_key: "Add your Govee API key in ⚙︎ settings.", bad_key: "Govee didn't accept the API key. Check it in ⚙︎ settings.",
+  rate: "Govee is limiting requests. Try again in a minute." };
+async function loadLights() {
+  if (!panelOn("lights") || lightsBusy) return;
+  lightsLast = Date.now();
+  let d; try { d = await (await fetch("/api/lights")).json(); } catch (e) { return; }
+  if (lightsBusy) return;               // a tap happened while loading; its own refresh follows
+  const box = $("lts");
+  if (!d.ok) { box.innerHTML = `<div class="empty">${esc(LIGHT_ERR[d.error] || "Can't reach Govee right now.")}</div>`; return; }
+  lightsData = d.rooms || [];
+  renderLights();
+}
+function renderLights() {
+  const box = $("lts");
+  if (!lightsData.length) { box.innerHTML = `<div class="empty">No lights to show. Choose them in ⚙︎ settings.</div>`; return; }
+  box.innerHTML = lightsData.map((r, i) => {
+    const st = r.offline ? "Offline" : r.on == null ? "…" : r.on ? ("On" + (r.bright != null ? " · " + r.bright + "%" : "")) : "Off";
+    const pct = r.on && r.bright != null ? r.bright : r.on ? 100 : 0;
+    return `<button class="lt ${r.on ? "on" : "off"}${r.offline ? " offline" : ""}" data-i="${i}"><span class="ln">${esc(r.name)}</span><span class="ls">${esc(st)}</span>${r.dim ? `<span class="lb"><i style="width:${pct}%"></i></span>` : ""}</button>`;
+  }).join("");
+  box.querySelectorAll(".lt").forEach(b => {
+    const r = lightsData[+b.dataset.i];
+    b.onpointerdown = e => {
+      // a press on the bottom strip (or a sideways drag) sets brightness; a plain tap switches on/off
+      const rect = b.getBoundingClientRect(), sx = e.clientX, onBar = r.dim && e.clientY > rect.bottom - 26;
+      let dragging = onBar, pct = null;
+      b.setPointerCapture(e.pointerId);
+      const setFrom = x => { pct = Math.max(1, Math.min(100, Math.round((x - rect.left) / rect.width * 100))); const f = b.querySelector(".lb i"); if (f) f.style.width = pct + "%"; b.querySelector(".ls").textContent = "On · " + pct + "%"; b.classList.add("on"); b.classList.remove("off"); };
+      if (onBar) setFrom(e.clientX);
+      b.onpointermove = ev => { if (r.dim && (dragging || Math.abs(ev.clientX - sx) > 18)) { dragging = true; setFrom(ev.clientX); } };
+      b.onpointerup = () => {
+        b.onpointermove = b.onpointerup = null;
+        if (dragging && pct != null) { r.on = true; r.bright = pct; lightCmd(r.name, "brightness", pct); }
+        else { r.on = !r.on; renderLights(); lightCmd(r.name, r.on ? "on" : "off"); }
+      };
+    };
+  });
+}
+async function lightCmd(room, action, value) {
+  lightsBusy++;
+  try {
+    const d = await (await fetch("/api/lights", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ room, action, value }) })).json();
+    if (!d.ok) { $("lightmsg").textContent = LIGHT_ERR[d.error] ? LIGHT_ERR[d.error].split(".")[0] : "Govee didn't respond"; setTimeout(() => $("lightmsg").textContent = "", 5000); }
+  } catch (e) {}
+  lightsBusy--;
+  setTimeout(loadLights, 1500);
+}
+$("alloff").onclick = () => { lightsData.forEach(r => r.on = false); renderLights(); lightCmd("", "all-off"); };
+setInterval(() => { if (Date.now() - lightsLast > 60000) loadLights(); }, 15000);
+
+async function loadLightRows() {
+  const box = $("lightrows");
+  $("goveeKey").value = "";
+  $("goveeKey").placeholder = hasGovee ? "Key saved ✓ (paste a new one to replace it)" : "Paste the key Govee emailed you";
+  if (!hasGovee) { box.textContent = "After you save a key, your lights appear here."; return; }
+  box.textContent = "Loading your lights…";
+  let d; try { d = await (await fetch("/api/lights?all=1")).json(); } catch (e) { box.textContent = "Can't reach the local server."; return; }
+  if (!d.ok) { box.textContent = LIGHT_ERR[d.error] || "Can't reach Govee right now."; return; }
+  box.className = ""; box.innerHTML = `<div class="hint" style="margin:0 0 8px">Tick the lights to show. Give lights the same room name to control them with one button.</div>`;
+  d.devices.forEach(dv => {
+    const r = document.createElement("div"); r.className = "lrow";
+    r.innerHTML = `<input type="checkbox" data-light="${esc(dv.device)}" ${dv.hidden ? "" : "checked"} aria-label="Show ${esc(dv.name)}"><span>${esc(dv.name)} <span class="hint">${esc(dv.sku)}</span></span>
+      <input data-room="${esc(dv.device)}" placeholder="Room (optional), e.g. Office" maxlength="30" aria-label="Room for ${esc(dv.name)}">`;
+    r.querySelector("[data-room]").value = dv.room || "";
+    box.appendChild(r);
+  });
+  if (!d.devices.length) box.textContent = "Govee didn't return any lights for this key.";
+}
+function collectLights() {
+  if (!document.querySelector("#lightrows [data-light]")) return prefs.lights || { hidden: [], rooms: {} };
+  const out = { hidden: [], rooms: {} };
+  document.querySelectorAll("#lightrows [data-light]").forEach(i => { if (!i.checked) out.hidden.push(i.dataset.light); });
+  document.querySelectorAll("#lightrows [data-room]").forEach(i => { if (i.value.trim()) out.rooms[i.dataset.room] = i.value.trim(); });
+  return out;
+}
+
 /* settings: weather location and the action list */
 let wxDraft = null;
 function showWxCur() {
@@ -1218,15 +1340,37 @@ $("wxSearch").oninput = () => {
     if (!(d.results || []).length) res.innerHTML = `<span class="hint">No matches.</span>`;
   }, 350);
 };
+const ICONS = {
+  "Work": "💼 📁 📂 🗂️ 📊 📈 📝 📅 ✉️ 📧 📞 💬 🎥 🖥️ 💻 🧾",
+  "Home": "💡 🏠 🔒 🔓 🌡️ ❄️ 🔥 🛋️ 🛏️ 🚪 📺 🔈 🎵 🎧 ☕ 🍳",
+  "Tools": "⚙️ 🔧 🔍 🌐 🔗 ⬇️ 🖨️ 📷 🗑️ ⏻ 🌙 ☀️ ⏰ ⏱️ 🔔 🔕",
+  "Fun": "⭐ ❤️ ✅ 🚀 🎯 🏁 🏎️ 🎮 📚 🎨 🐶 🌿 🍕 🚗 ✈️ 🎉"
+};
+let icTarget = null;
+function openIconPicker(input) {
+  closeIconPicker();
+  icTarget = input;
+  const pk = document.createElement("div"); pk.className = "icpick"; pk.id = "icpick";
+  pk.innerHTML = Object.entries(ICONS).map(([h, list]) => `<div class="h">${h}</div><div class="g">${list.split(" ").map(e => `<button type="button" aria-label="${e}">${e}</button>`).join("")}</div>`).join("")
+    + `<div class="own">Or type any emoji. On a Mac, press Control + Command + Space for the full emoji picker.</div>`;
+  pk.querySelectorAll("button").forEach(b => b.onmousedown = e => { e.preventDefault(); input.value = b.textContent; closeIconPicker(); });
+  const r = input.getBoundingClientRect();
+  pk.style.left = (r.left + window.scrollX) + "px"; pk.style.top = (r.bottom + window.scrollY + 6) + "px";
+  document.body.appendChild(pk);
+}
+function closeIconPicker() { const pk = $("icpick"); if (pk) pk.remove(); icTarget = null; }
+document.addEventListener("mousedown", e => { if (icTarget && !e.target.closest("#icpick") && e.target !== icTarget) closeIconPicker(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeIconPicker(); });
 const ACT_PH = { app: "App name, e.g. Zoom", url: "https://…", shortcut: "Shortcut name, e.g. Office Lights On", folder: "~/Documents/Clients" };
 function actRow(a) {
   const d = document.createElement("div"); d.className = "arow";
-  d.innerHTML = `<input class="ic" maxlength="8" aria-label="Icon (an emoji)" placeholder="⭐">
+  d.innerHTML = `<input class="ic" maxlength="8" aria-label="Icon: click to choose" title="Click to choose an icon" placeholder="⭐">
     <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
     <select class="tp" aria-label="Type"><option value="app">App</option><option value="url">Link</option><option value="shortcut">Shortcut</option><option value="folder">Folder</option><option value="system">Mac</option></select>
     <span class="tw"></span>
     <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
   d.querySelector(".ic").value = a.icon || ""; d.querySelector(".lb").value = a.label || "";
+  d.querySelector(".ic").onclick = e => openIconPicker(e.target);
   const tp = d.querySelector(".tp"), tw = d.querySelector(".tw");
   const drawTarget = (val) => {
     if (tp.value === "system") {
@@ -1430,6 +1574,7 @@ async function openSetup() {
   $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
   loadActionRows();
   loadRemRows();
+  loadLightRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
@@ -1463,6 +1608,7 @@ $("save").onclick = async () => {
     calSource: $("calSource").value,
     weather: Object.assign({}, wxDraft || { name: "", lat: null, lon: null }, { units: $("wxUnits").value }),
     actions: collectActions(),
+    lights: collectLights(),
     hiddenRemLists: document.querySelector("#remrows input[data-remlist]")
       ? [...document.querySelectorAll("#remrows input[data-remlist]")].filter(i => !i.checked).map(i => i.dataset.remlist)
       : (prefs.hiddenRemLists || []),
@@ -1489,6 +1635,7 @@ $("save").onclick = async () => {
   const newLayout = { boxes: JSON.parse(JSON.stringify(draftBoxes)), music: $("musicSrc").value, ai: $("aiSrc").value, aiTask: $("aiTask").checked };
   try {
     const body = { calendars: cals, layout: newLayout, prefs: newPrefs };
+    if ($("goveeKey").value.trim()) { body.goveeKey = $("goveeKey").value.trim(); hasGovee = true; }
     if (document.querySelector("#namerows input[data-key]")) {
       body.nameOverrides = collectOverrides();
       body.hiddenSenders = [...document.querySelectorAll("#namerows input[data-hide]:checked")].map(i => i.dataset.hide);
