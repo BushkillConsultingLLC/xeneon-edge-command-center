@@ -442,7 +442,7 @@ DEFAULT_ACTIONS = [
     {"icon": "🔍", "label": "Google", "type": "url", "target": "https://www.google.com"},
     {"icon": "🔒", "label": "Lock screen", "type": "system", "target": "lock"},
 ]
-ACTION_TYPES = ("app", "url", "shortcut", "folder", "system")
+ACTION_TYPES = ("app", "url", "shortcut", "folder", "system", "light")
 SYSTEM_ACTIONS = ("lock", "screensaver")
 
 
@@ -466,6 +466,8 @@ def clean_action(a):
         if not (full == HOME or full.startswith(HOME + os.sep) or full.startswith("/Volumes/")):
             return None
     if t == "system" and target not in SYSTEM_ACTIONS:
+        return None
+    if t == "light" and len(target) > 30:
         return None
     return {"icon": icon, "label": label or target[:24], "type": t, "target": target}
 
@@ -492,6 +494,10 @@ def run_action(a):
             return True
         except Exception:
             return False
+    if t == "light":
+        if target == "__all_off__":
+            return lights_control("", "all-off").get("ok")
+        return lights_control(target, "toggle").get("ok")
     if t == "system" and target == "screensaver":
         return mac_open(["-a", "ScreenSaverEngine"])
     return False

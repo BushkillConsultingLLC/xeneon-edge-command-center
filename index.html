@@ -436,7 +436,7 @@
     <div class="fld"><label>Quick Actions: buttons on the Edge (icon, name, what it does)</label></div>
     <div id="actrows"></div>
     <button class="ghost" id="addAct" type="button">+ Add a button</button>
-    <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients.</div>
+    <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients. Light: switch one of your Govee rooms on and off, or turn every light off.</div>
     <hr>
     <div class="fld"><label for="goveeKey">Lights: Govee API key</label>
       <input id="goveeKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste the key Govee emailed you">
@@ -1366,14 +1366,20 @@ function actRow(a) {
   const d = document.createElement("div"); d.className = "arow";
   d.innerHTML = `<input class="ic" maxlength="8" aria-label="Icon: click to choose" title="Click to choose an icon" placeholder="⭐">
     <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
-    <select class="tp" aria-label="Type"><option value="app">App</option><option value="url">Link</option><option value="shortcut">Shortcut</option><option value="folder">Folder</option><option value="system">Mac</option></select>
+    <select class="tp" aria-label="Type"><option value="app">App</option><option value="url">Link</option><option value="shortcut">Shortcut</option><option value="folder">Folder</option><option value="system">Mac</option><option value="light">Light</option></select>
     <span class="tw"></span>
     <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
   d.querySelector(".ic").value = a.icon || ""; d.querySelector(".lb").value = a.label || "";
   d.querySelector(".ic").onclick = e => openIconPicker(e.target);
   const tp = d.querySelector(".tp"), tw = d.querySelector(".tw");
   const drawTarget = (val) => {
-    if (tp.value === "system") {
+    if (tp.value === "light") {
+      const rooms = lightRooms || [];
+      tw.innerHTML = `<select class="tg" aria-label="Which light"><option value="__all_off__">All lights off</option>${rooms.map(r => `<option value="${esc(r)}">Turn ${esc(r)} on/off</option>`).join("")}</select>`;
+      const sel = tw.querySelector(".tg");
+      if (val && val !== "__all_off__" && !rooms.includes(val)) sel.insertAdjacentHTML("beforeend", `<option value="${esc(val)}">Turn ${esc(val)} on/off</option>`);
+      sel.value = val || (rooms[0] || "__all_off__");
+    } else if (tp.value === "system") {
       tw.innerHTML = `<select class="tg" aria-label="What it does"><option value="lock">Lock screen</option><option value="screensaver">Start screen saver</option></select>`;
       tw.querySelector(".tg").value = ["lock", "screensaver"].includes(val) ? val : "lock";
     } else {
@@ -1400,7 +1406,14 @@ async function loadRemRows() {
   });
   if (!lists.length) box.textContent = "No lists found.";
 }
-function loadActionRows() {
+let lightRooms = null;
+async function loadActionRows() {
+  if (lightRooms === null) {
+    try { const d = await (await fetch("/api/lights")).json(); lightRooms = d.ok ? d.rooms.map(r => r.name) : []; } catch (e) { lightRooms = []; }
+  }
+  return loadActionRowsNow();
+}
+function loadActionRowsNow() {
   const box = $("actrows"); box.innerHTML = "";
   (prefs.actions || []).forEach(a => box.appendChild(actRow(a)));
 }
@@ -1572,7 +1585,7 @@ async function openSetup() {
   loadNameRows();
   wxDraft = prefs.weather && prefs.weather.lat != null ? Object.assign({}, prefs.weather) : null;
   $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
-  loadActionRows();
+  lightRooms = null; loadActionRows();
   loadRemRows();
   loadLightRows();
   $("savedmsg").textContent = "";
