@@ -472,10 +472,115 @@ def clean_action(a):
     return {"icon": icon, "label": label or target[:24], "type": t, "target": target}
 
 
+# Real icons for Quick Actions: the Mac's own icon for apps and folders, the site's logo for links
+ICON_CACHE = os.path.join(HOME, "Library", "Caches", "CommandCenter-icons")
+ICON_JXA = r'''
+ObjC.import("AppKit");
+function run(argv) {
+  var img = $.NSWorkspace.sharedWorkspace.iconForFile(argv[0]);
+  img.setSize($.NSMakeSize(256, 256));
+  var rep = $.NSBitmapImageRep.imageRepWithData(img.TIFFRepresentation);
+  var png = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $());
+  return png.writeToFileAtomically(argv[1], true) ? "ok" : "fail";
+}'''
+
+
+def app_path(name):
+    for d in APP_DIRS + ["/System/Applications/Utilities", "/Applications/Utilities"]:
+        p = os.path.join(d, name + ".app")
+        if os.path.exists(p):
+            return p
+    # close-enough names: "Outlook" finds Microsoft Outlook, "Settings" finds System Settings
+    for d in APP_DIRS + ["/System/Applications/Utilities", "/Applications/Utilities"]:
+        try:
+            hits = sorted(f for f in os.listdir(d) if f.endswith(".app") and name.lower() in f[:-4].lower())
+        except OSError:
+            continue
+        if hits:
+            return os.path.join(d, min(hits, key=len))
+    try:
+        r = subprocess.run(["/usr/bin/mdfind", 'kMDItemContentType == "com.apple.application-bundle" && kMDItemDisplayName == "*%s*"c'
+                            % name.replace('"', "").replace("*", "")], capture_output=True, text=True, timeout=4)
+        hits = [x for x in r.stdout.splitlines() if x.endswith(".app")]
+        return min(hits, key=len) if hits else None
+    except Exception:
+        return None
+
+
+def _png_ok(path):
+    try:
+        with open(path, "rb") as f:
+            head = f.read(8)
+        return (head[:4] == b"\x89PNG" or head[:3] == b"GIF" or head[:2] == b"\xff\xd8" or head[:4] == b"\x00\x00\x01\x00"
+                or head.lstrip()[:4] in (b"<svg", b"<?xm") or head[:4] == b"RIFF")
+    except Exception:
+        return False
+
+
+def action_icon(a):
+    """Path to a cached icon image for this action, or None."""
+    t, target = a["type"], a["target"]
+    if t not in ("app", "url", "folder"):
+        return None
+    os.makedirs(ICON_CACHE, exist_ok=True)
+    key = re.sub(r"[^A-Za-z0-9]+", "_", t + "_" + target)[:120]
+    out = os.path.join(ICON_CACHE, key + ".png")
+    if os.path.exists(out) and time.time() - os.path.getmtime(out) < 7 * 86400 and _png_ok(out):
+        return out
+    if t in ("app", "folder"):
+        src = app_path(target) if t == "app" else os.path.realpath(os.path.expanduser(target))
+        if not src or not os.path.exists(src):
+            return None
+        try:
+            subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", ICON_JXA, src, out],
+                           capture_output=True, timeout=8)
+            subprocess.run(["/usr/bin/sips", "-Z", "128", out], capture_output=True, timeout=8)
+        except Exception:
+            return None
+        return out if _png_ok(out) else None
+    host = urlparse(target).hostname or ""
+    if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host):
+        return None
+    # 1) the biggest icon the page itself declares, 2) /apple-touch-icon.png, 3) Google's favicon service
+    candidates = []
+    try:
+        req = urllib.request.Request(target, headers={"User-Agent": "Mozilla/5.0 (Macintosh) XeneonEdgeCommandCenter/1.0"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            base, html = r.geturl(), r.read(400_000).decode("utf-8", "replace")
+        found = []
+        for tag in re.findall(r"<link\b[^>]*>", html, re.I):
+            rel = (re.search(r'rel\s*=\s*["\']([^"\']+)', tag, re.I) or [None, ""])[1].lower()
+            href = (re.search(r'href\s*=\s*["\']([^"\']+)', tag, re.I) or [None, ""])[1]
+            if not href or "icon" not in rel or "mask" in rel:
+                continue
+            sizes = re.search(r'sizes\s*=\s*["\'](\d+)', tag, re.I)
+            score = (1000 if "apple-touch" in rel else 0) + (int(sizes.group(1)) if sizes else (500 if href.endswith(".svg") else 16))
+            found.append((score, urllib.parse.urljoin(base, href.replace("&amp;", "&"))))
+        candidates += [u for _, u in sorted(found, reverse=True) if u.startswith("https://")][:3]
+    except Exception:
+        pass
+    candidates += ["https://%s/apple-touch-icon.png" % host,
+                   "https://www.google.com/s2/favicons?" + urllib.parse.urlencode({"domain": host, "sz": 128})]
+    for url in candidates:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) XeneonEdgeCommandCenter/1.0"})
+            with urllib.request.urlopen(req, timeout=6) as r:
+                data = r.read(1_000_000)
+            if len(data) > 200:
+                with open(out, "wb") as f:
+                    f.write(data)
+                if _png_ok(out):
+                    return out
+        except Exception:
+            continue
+    return None
+
+
 def run_action(a):
     t, target = a["type"], a["target"]
     if t == "app":
-        return mac_open(["-a", target])
+        path = app_path(target)
+        return mac_open([path] if path else ["-a", target])
     if t == "url":
         return mac_open([target])
     if t == "folder":
@@ -1162,6 +1267,26 @@ class Handler(SimpleHTTPRequestHandler):
                                "hasGoveeKey": bool(cfg.get("goveeKey")), "rev": int(cfg.get("rev", 0))})
         if p == "/api/music":
             return self._json(music_state())
+        if p == "/api/icon":
+            q = parse_qs(u.query)
+            a = clean_action({"type": q.get("type", [""])[0], "target": q.get("target", [""])[0]})
+            path = action_icon(a) if a else None
+            if not path:
+                self.send_error(404)
+                return
+            with open(path, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            ctype = ("image/png" if data[:4] == b"\x89PNG" else "image/x-icon" if data[:4] == b"\x00\x00\x01\x00"
+                     else "image/jpeg" if data[:2] == b"\xff\xd8" else "image/webp" if data[:4] == b"RIFF"
+                     else "image/svg+xml" if data.lstrip()[:4] in (b"<svg", b"<?xm") else "image/gif")
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if p == "/api/music/art":
             path = music_art(parse_qs(u.query).get("id", [""])[0])
             if not path:

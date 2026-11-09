@@ -135,13 +135,20 @@
   .acts { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); grid-auto-rows: minmax(64px, 1fr); gap: 10px; margin-top: 12px; min-height: 0; overflow: hidden; align-content: stretch; }
   .act { background: var(--panel2); border: 0; border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--fg); min-height: 0; text-align: center; }
   .act:active { transform: scale(.96); background: var(--line); }
-  .act .ai { font-size: 30px; line-height: 1; } .act .al { font-size: 14px; font-weight: 600; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .act .ai { font-size: 30px; line-height: 1; }
+  .act .ai img { width: 40px; height: 40px; border-radius: 9px; object-fit: contain; display: block; }
+  .panel[data-h="1"] .act .ai img { width: 26px; height: 26px; border-radius: 6px; } .act .al { font-size: 14px; font-weight: 600; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .panel[data-h="1"] .acts { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-template-rows: 1fr; grid-auto-rows: 1fr; margin-top: 4px; gap: 6px; }
   .panel[data-h="1"] .act { flex-direction: row; gap: 6px; padding: 4px 8px; } .panel[data-h="1"] .act .ai { font-size: 22px; } .panel[data-h="1"] .act .al { font-size: 13px; -webkit-line-clamp: 1; text-align: left; }
   #actp[data-h="1"] .label { display: none; }
   .arow { display: grid; grid-template-columns: 64px 1fr 130px 1.4fr 40px; gap: 8px; margin-bottom: 8px; }
   .arow input, .arow select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 10px; font-size: 15px; width: 100%; }
-  .arow input.ic { text-align: center; font-size: 20px; cursor: pointer; caret-color: transparent; }
+  .arow .icb { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; font-size: 20px; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 42px; }
+  .arow .icb img, .icpick .real img { width: 26px; height: 26px; border-radius: 6px; object-fit: contain; }
+  .icpick .real { display: flex; align-items: center; gap: 10px; width: 100%; background: var(--panel2); border-radius: 10px; padding: 8px 10px; font-size: 14px; color: var(--fg); text-align: left; margin-bottom: 4px; }
+  .icpick .real[disabled] { opacity: .45; cursor: default; }
+  .icpick .typed { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .icpick .typed input { width: 64px; text-align: center; font-size: 20px; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 4px; }
   .icpick { position: absolute; z-index: 50; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.5); width: 372px; }
   .icpick .g { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
   .icpick button { background: none; border: 0; border-radius: 8px; font-size: 22px; padding: 5px 0; }
@@ -1235,7 +1242,7 @@ function renderActions() {
   const acts = prefs.actions || [];
   const box = $("acts");
   if (!acts.length) { box.innerHTML = `<div class="empty">Add buttons in ⚙︎ settings.</div>`; return; }
-  box.innerHTML = acts.map((a, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(a.icon || "▶︎")}</span><span class="al">${esc(a.label)}</span></button>`).join("");
+  box.innerHTML = acts.map((a, i) => `<button class="act" data-i="${i}"><span class="ai">${iconHtml(a)}</span><span class="al">${esc(a.label)}</span></button>`).join("");
   box.querySelectorAll(".act").forEach(b => b.onclick = () => macOpen({ kind: "action", i: +b.dataset.i }, b));
 }
 
@@ -1340,6 +1347,13 @@ $("wxSearch").oninput = () => {
     if (!(d.results || []).length) res.innerHTML = `<span class="hint">No matches.</span>`;
   }, 350);
 };
+const REAL_ICON_TYPES = ["app", "url", "folder"];
+const iconUrl = a => "/api/icon?" + new URLSearchParams({ type: a.type, target: a.target });
+function iconHtml(a) {
+  if (a.icon === "auto" && REAL_ICON_TYPES.includes(a.type) && a.target)
+    return `<img src="${esc(iconUrl(a))}" alt="" onerror="this.replaceWith(document.createTextNode('${esc((a.label || "?").trim()[0] || "?").replace(/'/g, "")}'))">`;
+  return esc(a.icon && a.icon !== "auto" ? a.icon : "▶︎");
+}
 const ICONS = {
   "Work": "💼 📁 📂 🗂️ 📊 📈 📝 📅 ✉️ 📧 📞 💬 🎥 🖥️ 💻 🧾",
   "Home": "💡 🏠 🔒 🔓 🌡️ ❄️ 🔥 🛋️ 🛏️ 🚪 📺 🔈 🎵 🎧 ☕ 🍳",
@@ -1350,27 +1364,49 @@ let icTarget = null;
 function openIconPicker(input) {
   closeIconPicker();
   icTarget = input;
+  const row = input.closest(".arow"), cur = rowAction(row);
+  const canReal = REAL_ICON_TYPES.includes(cur.type) && cur.target;
+  const what = cur.type === "url" ? "the website's own icon" : cur.type === "folder" ? "the folder's icon" : "the app's own icon";
   const pk = document.createElement("div"); pk.className = "icpick"; pk.id = "icpick";
-  pk.innerHTML = Object.entries(ICONS).map(([h, list]) => `<div class="h">${h}</div><div class="g">${list.split(" ").map(e => `<button type="button" aria-label="${e}">${e}</button>`).join("")}</div>`).join("")
-    + `<div class="own">Or type any emoji. On a Mac, press Control + Command + Space for the full emoji picker.</div>`;
-  pk.querySelectorAll("button").forEach(b => b.onmousedown = e => { e.preventDefault(); input.value = b.textContent; closeIconPicker(); });
+  pk.innerHTML = (REAL_ICON_TYPES.includes(cur.type)
+      ? `<button type="button" class="real" ${canReal ? "" : "disabled"}>${canReal ? `<img src="${esc(iconUrl(cur))}" alt="">` : ""}<span>${canReal ? "Use " + what : "Fill in what it opens first to use its real icon"}</span></button>` : "")
+    + Object.entries(ICONS).map(([h, list]) => `<div class="h">${h}</div><div class="g">${list.split(" ").map(e => `<button type="button" class="em" aria-label="${e}">${e}</button>`).join("")}</div>`).join("")
+    + `<div class="typed"><input maxlength="8" aria-label="Type an emoji" placeholder="🙂"><span class="own" style="margin:0">Or type any emoji here. Control + Command + Space opens the Mac's emoji picker.</span></div>`;
+  const realImg = pk.querySelector(".real img");
+  if (realImg) realImg.onerror = () => { const r = pk.querySelector(".real"); r.disabled = true; realImg.remove(); r.querySelector("span").textContent = "Couldn't find a real icon for this one"; };
+  const pick = v => { ti.onchange = ti.onkeydown = null; setRowIcon(row, v); closeIconPicker(); };
+  pk.querySelectorAll("button.em").forEach(b => b.onmousedown = e => { e.preventDefault(); pick(b.textContent); });
+  const rb = pk.querySelector(".real"); if (rb) rb.onmousedown = e => { e.preventDefault(); if (!rb.disabled) pick("auto"); };
+  const ti = pk.querySelector(".typed input");
+  ti.onkeydown = e => { if (e.key === "Enter" && ti.value.trim()) { e.preventDefault(); pick(ti.value.trim()); } };
+  ti.onchange = () => { if (ti.value.trim()) pick(ti.value.trim()); };
   const r = input.getBoundingClientRect();
   pk.style.left = (r.left + window.scrollX) + "px"; pk.style.top = (r.bottom + window.scrollY + 6) + "px";
   document.body.appendChild(pk);
 }
 function closeIconPicker() { const pk = $("icpick"); if (pk) pk.remove(); icTarget = null; }
-document.addEventListener("mousedown", e => { if (icTarget && !e.target.closest("#icpick") && e.target !== icTarget) closeIconPicker(); });
+document.addEventListener("mousedown", e => { if (icTarget && !e.target.closest("#icpick") && !icTarget.contains(e.target)) closeIconPicker(); });
+function rowAction(row) {
+  const tg = row.querySelector(".tg");
+  return { icon: row.querySelector(".icb").dataset.icon || "", label: row.querySelector(".lb").value.trim(),
+           type: row.querySelector(".tp").value, target: tg ? tg.value.trim() : "" };
+}
+function setRowIcon(row, v) {
+  const b = row.querySelector(".icb");
+  b.dataset.icon = v;
+  b.innerHTML = v ? iconHtml(Object.assign(rowAction(row), { icon: v })) : `<span style="opacity:.4">⭐</span>`;
+}
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeIconPicker(); });
 const ACT_PH = { app: "App name, e.g. Zoom", url: "https://…", shortcut: "Shortcut name, e.g. Office Lights On", folder: "~/Documents/Clients" };
 function actRow(a) {
   const d = document.createElement("div"); d.className = "arow";
-  d.innerHTML = `<input class="ic" maxlength="8" aria-label="Icon: click to choose" title="Click to choose an icon" placeholder="⭐">
+  d.innerHTML = `<button type="button" class="icb" aria-label="Icon: click to choose" title="Click to choose an icon"></button>
     <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
     <select class="tp" aria-label="Type"><option value="app">App</option><option value="url">Link</option><option value="shortcut">Shortcut</option><option value="folder">Folder</option><option value="system">Mac</option><option value="light">Light</option></select>
     <span class="tw"></span>
     <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
-  d.querySelector(".ic").value = a.icon || ""; d.querySelector(".lb").value = a.label || "";
-  d.querySelector(".ic").onclick = e => openIconPicker(e.target);
+  d.querySelector(".lb").value = a.label || "";
+  d.querySelector(".icb").onclick = () => openIconPicker(d.querySelector(".icb"));
   const tp = d.querySelector(".tp"), tw = d.querySelector(".tw");
   const drawTarget = (val) => {
     if (tp.value === "light") {
@@ -1388,7 +1424,11 @@ function actRow(a) {
     }
   };
   tp.value = a.type || "app"; drawTarget(a.target);
-  tp.onchange = () => drawTarget("");
+  setRowIcon(d, a.icon != null ? a.icon : "auto");
+  let icTimer;
+  const refreshIcon = () => { clearTimeout(icTimer); icTimer = setTimeout(() => { const b = d.querySelector(".icb"); if (b.dataset.icon === "auto") setRowIcon(d, "auto"); }, 600); };
+  tp.onchange = () => { drawTarget(""); refreshIcon(); };
+  tw.addEventListener("input", refreshIcon); tw.addEventListener("change", refreshIcon);
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
@@ -1417,10 +1457,10 @@ function loadActionRowsNow() {
   const box = $("actrows"); box.innerHTML = "";
   (prefs.actions || []).forEach(a => box.appendChild(actRow(a)));
 }
-$("addAct").onclick = () => $("actrows").appendChild(actRow({ type: "app" }));
+$("addAct").onclick = () => $("actrows").appendChild(actRow({ type: "app", icon: "auto" }));
 function collectActions() {
   return [...$("actrows").children].map(r => ({
-    icon: r.querySelector(".ic").value.trim(), label: r.querySelector(".lb").value.trim(),
+    icon: r.querySelector(".icb").dataset.icon || "", label: r.querySelector(".lb").value.trim(),
     type: r.querySelector(".tp").value, target: r.querySelector(".tg").value.trim() })).filter(a => a.target);
 }
 
