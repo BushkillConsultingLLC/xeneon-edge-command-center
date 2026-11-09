@@ -992,6 +992,17 @@ GOVEE = os.environ.get("CC_GOVEE_API", "https://openapi.api.govee.com/router/api
 _govee = {"devices": None, "dt": 0, "states": {}, "err": ""}
 
 
+def _govee_log(line):
+    """Local troubleshooting note (never includes the API key)."""
+    try:
+        path = os.path.join(ROOT, "govee-debug.txt")
+        old = open(path).read().splitlines()[-60:] if os.path.exists(path) else []
+        with open(path, "w") as f:
+            f.write("\n".join(old + [time.strftime("%H:%M:%S ") + line[:600]]) + "\n")
+    except Exception:
+        pass
+
+
 def _govee_call(method, path, payload=None, timeout=8):
     key = load_config().get("goveeKey")
     if not key:
@@ -1002,9 +1013,23 @@ def _govee_call(method, path, payload=None, timeout=8):
                                           "User-Agent": "XeneonEdgeCommandCenter/1.0"})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
-            return json.loads(r.read(2_000_000))
+            d = json.loads(r.read(2_000_000))
     except urllib.error.HTTPError as e:
+        body = ""
+        try:
+            body = e.read(400).decode("utf-8", "replace")
+        except Exception:
+            pass
+        _govee_log("%s %s -> HTTP %d %s" % (method, path, e.code, body))
         raise RuntimeError({401: "bad_key", 403: "bad_key", 429: "rate"}.get(e.code, "http_%d" % e.code))
+    # Govee answers HTTP 200 even for some failures; the real result is in "code"
+    code = d.get("code")
+    if path == "/device/control":
+        _govee_log("control %s %s %s=%s -> %s %s" % (payload.get("sku"), payload.get("device", "")[-5:],
+                   payload["capability"]["instance"], payload["capability"]["value"], code, d.get("msg") or d.get("message")))
+    if code not in (None, 200):
+        raise RuntimeError("govee_%s: %s" % (code, d.get("msg") or d.get("message") or ""))
+    return d
 
 
 def govee_devices(force=False):
@@ -1012,6 +1037,8 @@ def govee_devices(force=False):
         return _govee["devices"]
     d = _govee_call("GET", "/user/devices")
     out = []
+    _govee_log("devices: " + "; ".join("%s [%s %s] %s" % (x.get("deviceName"), x.get("sku"), x.get("type", ""),
+               ",".join(c.get("instance", "") for c in x.get("capabilities") or [])) for x in d.get("data") or []))
     for x in d.get("data") or []:
         caps = {c.get("instance") for c in x.get("capabilities") or []}
         if "powerSwitch" not in caps:
@@ -1094,13 +1121,18 @@ def lights_control(room, action, value=None):
     if action == "toggle":
         sts = [govee_state(d) for d in targets]
         action = "off" if any(s["on"] for s in sts) else "on"
-    errs = 0
+    errs, err = 0, ""
+    _govee_log("request: %s -> %s %s (%d light%s)" % (room or "all", action, value if value is not None else "",
+                                                      len(targets), "" if len(targets) == 1 else "s"))
     for d in targets:
         if action in ("on", "off"):
             cap = {"type": "devices.capabilities.on_off", "instance": "powerSwitch", "value": 1 if action == "on" else 0}
         elif action == "brightness" and d["dim"]:
             cap = {"type": "devices.capabilities.range", "instance": "brightness", "value": max(1, min(100, int(value or 50)))}
         else:
+            _govee_log("skipped %s: %s isn't supported by this light" % (d["name"], action))
+            errs += 1
+            err = "no_dim"
             continue
         try:
             if action == "brightness" and not (_govee["states"].get(d["device"]) or {}).get("on"):
@@ -1116,7 +1148,7 @@ def lights_control(room, action, value=None):
         except Exception as e:
             errs += 1
             err = str(e)[:60]
-    return {"ok": errs == 0, "error": err if errs else ""}
+    return {"ok": errs == 0, "error": err}
 
 
 # ---------------- Apple Reminders (read with AppleScript, no account needed) ----------------

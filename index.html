@@ -48,6 +48,7 @@
   button.ev { border-radius: 10px; padding-left: 0; padding-right: 6px; }
   button.msg { background: var(--panel2); display: block; }
   .tapped { outline: 2px solid var(--blue); outline-offset: 2px; }
+  .failed { outline: 2px solid var(--red) !important; outline-offset: 2px; }
   #msgp .label { cursor: pointer; }
   .next .k { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
   .next .k b { color: var(--fg); }
@@ -700,7 +701,8 @@ function findMeetingUrl(text) {
 async function macOpen(body, el) {
   if (el) { el.classList.add("tapped"); setTimeout(() => el.classList.remove("tapped"), 400); }
   try {
-    await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const r = await (await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })).json();
+    if (el && r && r.ok === false) { el.classList.add("failed"); setTimeout(() => el.classList.remove("failed"), 2500); }
   } catch (e) {}
 }
 function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }

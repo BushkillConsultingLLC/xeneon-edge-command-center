@@ -143,6 +143,7 @@ Logs: `~/Library/Logs/CommandCenter.log`.
 | The AI card never updates | Run **Connect AI Assistant**, then start a *new* Claude Code session (hooks load at startup). |
 | Notification tiles all say 0 | Allow Terminal under *Privacy & Security → Accessibility*, then restart. A tile can only show what the app's Dock icon shows: if the icon has no red badge, neither will the tile. |
 | A blocked or junk sender still shows in Messages | The dashboard skips blocked conversations and anything Messages filed as Junk. For anyone else, tick **Hide** next to them under *Names in Messages* in settings. |
+| A Light button does nothing | Groups made in the Govee app don't respond well to Govee's API. In settings → Lights, give each light in the group the same room name and untick the group; buttons then control every light directly. |
 | Mail or Gmail tile says 0 with no Dock badge | The dashboard falls back to asking Mail for its unread count (allow Terminal to control Mail when macOS asks) and to reading the count in the Gmail window title ("Inbox (3)"). |
 | Touch does nothing | Check both permissions for MacXeneonEdgeTouchDriver, then rerun **Install Touch Driver**. |
 
