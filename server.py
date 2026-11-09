@@ -13,6 +13,7 @@ import re
 import sqlite3
 import subprocess
 import time
+import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -350,7 +351,7 @@ def open_meeting(url):
 
 
 # ---------------- layout (which panels, which services) ----------------
-PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders")
+PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders", "weather", "actions")
 # Older versions split the Edge into 8 zones: 1-4 across the top, 5-8 across the bottom.
 GRID_W, GRID_H = 8, 4
 # Each panel gets a box on an 8 x 4 grid: [x, y, width, height] in cells.
@@ -432,9 +433,73 @@ def zones_from_panels(panels):
 
 
 DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
+# Quick Actions: buttons on the Edge. type is app | url | shortcut | folder | system
+DEFAULT_ACTIONS = [
+    {"icon": "📁", "label": "Downloads", "type": "folder", "target": "~/Downloads"},
+    {"icon": "📅", "label": "Calendar", "type": "app", "target": "Calendar"},
+    {"icon": "🔍", "label": "Google", "type": "url", "target": "https://www.google.com"},
+    {"icon": "🔒", "label": "Lock screen", "type": "system", "target": "lock"},
+]
+ACTION_TYPES = ("app", "url", "shortcut", "folder", "system")
+SYSTEM_ACTIONS = ("lock", "screensaver")
+
+
+def clean_action(a):
+    if not isinstance(a, dict):
+        return None
+    t = a.get("type")
+    target = str(a.get("target", "")).strip()[:500]
+    label = str(a.get("label", "")).strip()[:24]
+    icon = str(a.get("icon", "")).strip()[:8]
+    if t not in ACTION_TYPES or not target:
+        return None
+    if t == "app" and not re.fullmatch(r"[\w .&+'()-]{1,40}", target):
+        return None
+    if t == "url" and not re.match(r"https://[^\s]+$", target):
+        return None
+    if t == "shortcut" and (len(target) > 80 or re.search(r"[\r\n]", target)):
+        return None
+    if t == "folder":
+        full = os.path.realpath(os.path.expanduser(target))
+        if not (full == HOME or full.startswith(HOME + os.sep) or full.startswith("/Volumes/")):
+            return None
+    if t == "system" and target not in SYSTEM_ACTIONS:
+        return None
+    return {"icon": icon, "label": label or target[:24], "type": t, "target": target}
+
+
+def run_action(a):
+    t, target = a["type"], a["target"]
+    if t == "app":
+        return mac_open(["-a", target])
+    if t == "url":
+        return mac_open([target])
+    if t == "folder":
+        full = os.path.realpath(os.path.expanduser(target))
+        return os.path.isdir(full) and mac_open([full])
+    if t == "shortcut":
+        try:
+            subprocess.Popen(["/usr/bin/shortcuts", "run", target], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+            return True
+        except Exception:
+            return False
+    if t == "system" and target == "lock":
+        try:
+            subprocess.Popen(["/usr/bin/pmset", "displaysleepnow"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
+        except Exception:
+            return False
+    if t == "system" and target == "screensaver":
+        return mac_open(["-a", "ScreenSaverEngine"])
+    return False
+
+
 DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscreen": True, "spotifyReset": 0,
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
-                 "calSource": "links", "hiddenCals": [], "tiles": {}}
+                 "calSource": "links", "hiddenCals": [], "tiles": {},
+                 "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
+                 "actions": DEFAULT_ACTIONS}
 
 
 def get_prefs():
@@ -464,6 +529,17 @@ def get_prefs():
             if label or target:
                 tiles[str(app)[:40]] = {"label": label, "open": target}
         p["tiles"] = tiles
+    w = saved.get("weather")
+    if isinstance(w, dict):
+        try:
+            lat, lon = float(w.get("lat")), float(w.get("lon"))
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                p["weather"] = {"name": str(w.get("name", ""))[:60], "lat": round(lat, 4), "lon": round(lon, 4),
+                                "units": "c" if w.get("units") == "c" else "f"}
+        except (TypeError, ValueError):
+            p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
+    if isinstance(saved.get("actions"), list):
+        p["actions"] = [a for a in (clean_action(x) for x in saved["actions"][:16]) if a]
     if saved.get("calSource") in ("links", "apple", "both"):
         p["calSource"] = saved["calSource"]
     if isinstance(saved.get("hiddenCals"), list):
@@ -693,6 +769,59 @@ def badges():
     return {"ok": True, "apps": out, "note": note}
 
 
+# ---------------- Weather (Open-Meteo: free, no key, no sign-in) ----------------
+_wx_cache = {"t": 0, "key": None, "data": None}
+
+
+def _get_json(url, timeout=8):
+    req = urllib.request.Request(url, headers={"User-Agent": "XeneonEdgeCommandCenter/1.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read(2_000_000))
+
+
+def weather(force=False):
+    w = get_prefs()["weather"]
+    if w.get("lat") is None:
+        return {"ok": False, "error": "no_location"}
+    key = (w["lat"], w["lon"], w["units"])
+    if not force and _wx_cache["data"] and _wx_cache["key"] == key and time.time() - _wx_cache["t"] < 600:
+        return _wx_cache["data"]
+    q = urllib.parse.urlencode({
+        "latitude": w["lat"], "longitude": w["lon"], "timezone": "auto", "forecast_days": 3,
+        "current": "temperature_2m,apparent_temperature,weather_code,wind_speed_10m,is_day,relative_humidity_2m",
+        "hourly": "temperature_2m,precipitation_probability,weather_code,is_day",
+        "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code,sunrise,sunset",
+        "temperature_unit": "celsius" if w["units"] == "c" else "fahrenheit",
+        "wind_speed_unit": "kmh" if w["units"] == "c" else "mph",
+    })
+    try:
+        d = _get_json("https://api.open-meteo.com/v1/forecast?" + q)
+    except Exception as e:
+        if _wx_cache["data"] and _wx_cache["key"] == key:
+            return _wx_cache["data"]          # keep showing the last forecast while offline
+        return {"ok": False, "error": "unreachable", "detail": str(e)[:200]}
+    out = {"ok": True, "name": w["name"], "units": w["units"], "current": d.get("current", {}),
+           "hourly": d.get("hourly", {}), "daily": d.get("daily", {}), "fetched": int(time.time() * 1000)}
+    _wx_cache.update(t=time.time(), key=key, data=out)
+    return out
+
+
+def geocode(q):
+    q = (q or "").strip()[:80]
+    if len(q) < 2:
+        return {"ok": True, "results": []}
+    try:
+        d = _get_json("https://geocoding-api.open-meteo.com/v1/search?" +
+                      urllib.parse.urlencode({"name": q, "count": 6, "language": "en", "format": "json"}))
+    except Exception:
+        return {"ok": False, "results": []}
+    res = []
+    for r in d.get("results") or []:
+        label = ", ".join(x for x in (r.get("name"), r.get("admin1"), r.get("country_code")) if x)
+        res.append({"name": label, "lat": r.get("latitude"), "lon": r.get("longitude")})
+    return {"ok": True, "results": res}
+
+
 # ---------------- Apple Reminders (read with AppleScript, no account needed) ----------------
 _rem_cache = {"t": 0, "data": None}
 REM_SCRIPT = r'''
@@ -911,6 +1040,10 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(badges())
         if p == "/api/reminders":
             return self._json(reminders(force=parse_qs(u.query).get("force") == ["1"]))
+        if p == "/api/weather":
+            return self._json(weather(force=parse_qs(u.query).get("force") == ["1"]))
+        if p == "/api/geocode":
+            return self._json(geocode(parse_qs(u.query).get("q", [""])[0]))
         if p == "/api/senders":
             d = recent_messages(limit=60, include_hidden=True)
             cfg = load_config()
@@ -980,6 +1113,12 @@ class Handler(SimpleHTTPRequestHandler):
                         ok = mac_open((["-a", "Google Chrome"] if chrome else []) + [target])
                     else:
                         ok = mac_open(["-a", target or name])
+                elif kind == "weather-app":
+                    ok = mac_open(["-a", "Weather"])
+                elif kind == "action":
+                    acts = get_prefs()["actions"]
+                    i = int(body.get("i", -1))
+                    ok = 0 <= i < len(acts) and run_action(acts[i])
                 elif kind == "settings":
                     # in your normal browser, on the main screen, where typing works
                     ok = mac_open(["http://127.0.0.1:%d/?settings" % PORT])
@@ -1049,7 +1188,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

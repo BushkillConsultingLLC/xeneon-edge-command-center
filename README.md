@@ -14,6 +14,8 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 | **Notifications** | Big tiles with the unread counts **Messages**, **Outlook**, **Mail**, **Slack**, **Teams** and other apps show on their Dock icons. No sign-ins: macOS already knows the numbers. Tap a tile to open the app. Choose which apps in settings. |
 | **Reminders** | Your open **Apple Reminders** across all lists: flagged and overdue first, then today, then upcoming. Tap the circle to check one off; it syncs to your iPhone like any other change. |
 | **AI assistant** | Live service status for **Claude**, **ChatGPT / OpenAI** or **GitHub Copilot**, plus a task card that shows what your assistant is working on. **Claude Code** and **Codex** can fill it automatically. |
+| **Weather** | Current conditions, the next 12 hours, a heads-up when rain or snow is likely, and a 3-day outlook on taller tiles. Free from [Open-Meteo](https://open-meteo.com): no key, no sign-in. Choose your town in settings. Tap to open the Weather app. |
+| **Quick Actions** | Your own touch buttons: open an app, a link, or a folder, lock the screen, or run any **Shortcut** from the Shortcuts app (Focus modes, smart-home scenes, and anything else you can build there). |
 
 **Pick what you see.** The Edge is laid out as a grid, **8 cells across and 4 down**. In settings, drag a tile to move it and drag its corner to resize it, anywhere from 1 × 1 up to the whole screen. Tiles can't overlap: a move that would land on another tile turns red and snaps back. Remove a tile with ✕ and add it back from the list underneath. Every panel has compact versions for one-row and one-column tiles. Layouts from older versions (8 zones) are converted automatically.
 

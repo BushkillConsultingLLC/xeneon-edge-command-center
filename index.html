@@ -108,6 +108,43 @@
     .cb.sm { display: none; }
   }
 
+  /* ---------- weather ---------- */
+  #wxp { cursor: pointer; }
+  .wx-now { display: flex; align-items: center; gap: 16px; margin-top: 12px; }
+  .wx-ic { font-size: 56px; line-height: 1; }
+  .wx-t { font-size: 60px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .wx-c { font-size: 18px; font-weight: 600; }
+  .wx-s { font-size: 14px; color: var(--muted); margin-top: 3px; }
+  .wx-alert { margin-top: 10px; font-size: 15px; color: var(--muted); }
+  .wx-alert.rain { color: var(--amber); font-weight: 600; }
+  .wx-hours { display: flex; gap: 6px; margin-top: 12px; overflow: hidden; }
+  .wx-h { flex: 1 0 58px; background: var(--panel2); border-radius: 12px; padding: 8px 4px; text-align: center; font-size: 13px; color: var(--muted); }
+  .wx-h b { display: block; font-size: 22px; margin: 3px 0; font-weight: 400; } .wx-h .tp { color: var(--fg); font-size: 16px; font-weight: 600; }
+  .wx-h .pp { color: var(--blue); font-size: 12px; min-height: 15px; }
+  .wx-days { display: none; gap: 8px; margin-top: 10px; }
+  .panel[data-h="3"] .wx-days, .panel[data-h="4"] .wx-days { display: flex; }
+  .wx-d { flex: 1; background: var(--panel2); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .wx-d b { color: var(--fg); }
+  .panel[data-h="1"] .wx-now { margin-top: 4px; gap: 10px; } .panel[data-h="1"] .wx-ic { font-size: 34px; } .panel[data-h="1"] .wx-t { font-size: 38px; }
+  .panel[data-h="1"] .wx-c { font-size: 15px; } .panel[data-h="1"] .wx-s { font-size: 12px; }
+  .panel[data-h="1"] .wx-hours { display: none; } .panel[data-h="1"] .wx-alert { margin-top: 4px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #wxp[data-h="1"] .label { display: none; }
+  .panel[data-w="1"] .wx-now { flex-wrap: wrap; gap: 8px; } .panel[data-w="1"] .wx-t { font-size: 46px; } .panel[data-w="1"] .wx-ic { font-size: 40px; }
+
+  /* ---------- quick actions ---------- */
+  .acts { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); grid-auto-rows: minmax(64px, 1fr); gap: 10px; margin-top: 12px; min-height: 0; overflow: hidden; align-content: stretch; }
+  .act { background: var(--panel2); border: 0; border-radius: 14px; padding: 8px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--fg); min-height: 0; text-align: center; }
+  .act:active { transform: scale(.96); background: var(--line); }
+  .act .ai { font-size: 30px; line-height: 1; } .act .al { font-size: 14px; font-weight: 600; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .panel[data-h="1"] .acts { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-template-rows: 1fr; grid-auto-rows: 1fr; margin-top: 4px; gap: 6px; }
+  .panel[data-h="1"] .act { flex-direction: row; gap: 6px; padding: 4px 8px; } .panel[data-h="1"] .act .ai { font-size: 22px; } .panel[data-h="1"] .act .al { font-size: 13px; -webkit-line-clamp: 1; text-align: left; }
+  #actp[data-h="1"] .label { display: none; }
+  .arow { display: grid; grid-template-columns: 64px 1fr 130px 1.4fr 40px; gap: 8px; margin-bottom: 8px; }
+  .arow input, .arow select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 10px; font-size: 15px; width: 100%; }
+  .arow input.ic { text-align: center; font-size: 18px; }
+  .wxres { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .wxres button { background: var(--panel2); border: 1px solid var(--line); border-radius: 99px; color: var(--fg); padding: 7px 12px; font-size: 14px; }
+
   /* ---------- one-row tiles (a quarter of the Edge's height) ---------- */
   .panel[data-h="1"] { padding: 12px 16px; }
   .panel[data-h="1"] .label { font-size: 11px; }
@@ -126,7 +163,7 @@
   .panel[data-h="1"] .msg .body { -webkit-line-clamp: 1; font-size: 14px; margin-top: 2px; } .panel[data-h="1"] .msg .who { font-size: 15px; }
   .panel[data-h="1"] .sp-body { margin-top: 6px; gap: 12px; } .panel[data-h="1"] .art { width: calc(100cqh - 46px); }
   .panel[data-h="1"] .track { font-size: 17px; -webkit-line-clamp: 1; } .panel[data-h="1"] .artist { font-size: 13px; }
-  .panel[data-h="1"] .prog, .panel[data-h="1"] .dev, .panel[data-h="1"] #spot .label { display: none; }
+  .panel[data-h="1"] .prog, .panel[data-h="1"] .dev, #spot[data-h="1"] .label { display: none; }
   .panel[data-h="1"] .ctrls { margin-top: 2px; gap: 6px; } .panel[data-h="1"] .cb { width: 38px; height: 38px; } .panel[data-h="1"] .cb.play { width: 44px; height: 44px; }
   .panel[data-h="1"] .cb svg { width: 18px; height: 18px; } .panel[data-h="1"] .cb.sm { display: none; }
   .panel[data-h="1"] .svc { margin-top: 6px; font-size: 14px; } .panel[data-h="1"] .svc-sub { display: none; }
@@ -311,6 +348,18 @@
     <div class="rems" id="rems"><div class="empty">Loading…</div></div>
   </section>
 
+  <!-- WEATHER -->
+  <section class="panel" id="wxp">
+    <div class="label">Weather<span class="sp"></span><span class="pill" id="wxplace"></span></div>
+    <div id="wx"><div class="empty">Loading…</div></div>
+  </section>
+
+  <!-- QUICK ACTIONS -->
+  <section class="panel" id="actp">
+    <div class="label">Quick Actions</div>
+    <div class="acts" id="acts"></div>
+  </section>
+
   <!-- CLAUDE -->
   <section class="panel" id="cl">
     <div class="label" id="ailabel"><span style="color:var(--claude)">✳︎</span> Claude</div>
@@ -344,6 +393,16 @@
       <div class="hint">Signing in to Spotify happens on the Edge itself: tap "Sign in with Spotify" there once.</div>
       <hr>
     </div>
+    <div class="fld"><label for="wxSearch">Weather location</label>
+      <div style="display:flex;gap:8px"><input id="wxSearch" placeholder="Search a city or ZIP, e.g. Easton, PA" spellcheck="false" style="flex:1">
+      <select id="wxUnits" style="width:110px"><option value="f">°F</option><option value="c">°C</option></select></div>
+      <div class="hint" id="wxCur"></div><div class="wxres" id="wxRes"></div></div>
+    <hr>
+    <div class="fld"><label>Quick Actions: buttons on the Edge (icon, name, what it does)</label></div>
+    <div id="actrows"></div>
+    <button class="ghost" id="addAct" type="button">+ Add a button</button>
+    <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients.</div>
+    <hr>
     <div class="fld" style="margin-top:6px"><label>Names in Messages (type a name to always use it, or tick Hide to keep a sender off the Edge)</label></div>
     <div id="namerows" class="hint" style="margin:0 0 10px">Loading recent senders…</div>
     <div class="fld"><label>Notifications panel: apps to count</label></div>
@@ -387,9 +446,9 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 /* =========================================================
    LAYOUT (which panels show, how wide, in what order)
    ========================================================= */
-const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp" };
-const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders" };
-const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942" };
+const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp", weather: "wxp", actions: "actp" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders", weather: "Weather", actions: "Quick Actions" };
+const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942", weather: "#4dd0e1", actions: "#b0bec5" };
 const GW = 8, GH = 4;      // the Edge as a grid: 8 cells across, 4 down
 let layout = { boxes: { calendar: [0, 0, 2, 4], messages: [2, 0, 2, 4], music: [4, 0, 2, 4], ai: [6, 0, 2, 2], reminders: [6, 2, 2, 2] }, music: "spotify", ai: "claude", aiTask: true };
 const panelOn = id => !!(layout.boxes || {})[id];
@@ -404,7 +463,7 @@ function applyLayout() {
     }
   });
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
-  loadBadges(); loadReminders(false);
+  loadBadges(); loadReminders(false); loadWeather(); renderActions();
   applyAi();
   applyMusicMode();
 }
@@ -1071,6 +1130,126 @@ function calRow(c, i) {
   d.querySelector(".x").onclick = () => d.remove();
   return d;
 }
+/* =========================================================
+   WEATHER (Open-Meteo through the local server: free, no key)
+   ========================================================= */
+const WX = c => c === 0 ? ["☀️", "Clear"] : c === 1 ? ["🌤️", "Mostly clear"] : c === 2 ? ["⛅", "Partly cloudy"] : c === 3 ? ["☁️", "Cloudy"]
+  : c === 45 || c === 48 ? ["🌫️", "Fog"] : c >= 51 && c <= 57 ? ["🌦️", "Drizzle"] : c >= 61 && c <= 67 ? ["🌧️", "Rain"]
+  : c >= 71 && c <= 77 ? ["🌨️", "Snow"] : c >= 80 && c <= 82 ? ["🌦️", "Showers"] : c >= 85 && c <= 86 ? ["🌨️", "Snow showers"]
+  : c >= 95 ? ["⛈️", "Thunderstorms"] : ["🌡️", ""];
+const wxIcon = (c, day) => (!day && (c === 0 || c === 1)) ? "🌙" : WX(c)[0];
+const hourLabel = t => { const h = +t.slice(11, 13); return h === 0 ? "12a" : h < 12 ? h + "a" : h === 12 ? "12p" : (h - 12) + "p"; };
+const RAINY = c => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95 || (c >= 71 && c <= 77) || c === 85 || c === 86;
+let wxLast = 0;
+async function loadWeather() {
+  if (!panelOn("weather")) return;
+  wxLast = Date.now();
+  let d;
+  try { d = await (await fetch("/api/weather")).json(); } catch (e) { return; }
+  const box = $("wx");
+  if (!d.ok) {
+    box.innerHTML = `<div class="empty">${d.error === "no_location" ? "Choose your town in ⚙︎ settings." : "Weather is unavailable right now."}</div>`;
+    $("wxplace").textContent = ""; return;
+  }
+  const cur = d.current || {}, H = d.hourly || {}, D = d.daily || {}, deg = "°";
+  $("wxplace").textContent = (d.name || "").split(",").slice(0, 2).join(",");
+  const [ic, cond] = WX(cur.weather_code);
+  let i0 = (H.time || []).findIndex(t => t.slice(0, 13) >= String(cur.time || "").slice(0, 13));
+  if (i0 < 0) i0 = 0;
+  // rain in the next 12 hours?
+  let alert = `<div class="wx-alert">No rain expected in the next 12 hours.</div>`;
+  if (RAINY(cur.weather_code)) alert = `<div class="wx-alert rain">${esc(cond)} now.</div>`;
+  else for (let i = i0 + 1; i < Math.min(i0 + 13, (H.time || []).length); i++) {
+    if ((H.precipitation_probability[i] || 0) >= 50) {
+      const snow = (H.weather_code[i] >= 71 && H.weather_code[i] <= 77) || H.weather_code[i] === 85 || H.weather_code[i] === 86;
+      alert = `<div class="wx-alert rain">${snow ? "Snow" : "Rain"} likely around ${esc(hourLabel(H.time[i]).replace("a", " AM").replace("p", " PM"))} (${H.precipitation_probability[i]}%)</div>`;
+      break;
+    }
+  }
+  const hours = (H.time || []).slice(i0 + 1, i0 + 13).map((t, k) => {
+    const i = i0 + 1 + k, pp = H.precipitation_probability[i] || 0;
+    return `<div class="wx-h">${esc(hourLabel(t))}<b>${wxIcon(H.weather_code[i], H.is_day[i])}</b><div class="tp">${Math.round(H.temperature_2m[i])}${deg}</div><div class="pp">${pp >= 20 ? pp + "%" : ""}</div></div>`;
+  }).join("");
+  const days = (D.time || []).slice(0, 3).map((t, i) => {
+    const name = i === 0 ? "Today" : new Date(t + "T12:00").toLocaleDateString([], { weekday: "short" });
+    return `<div class="wx-d"><span style="font-size:22px">${WX(D.weather_code[i])[0]}</span><span><b>${esc(name)}</b><br>${Math.round(D.temperature_2m_max[i])}${deg} / ${Math.round(D.temperature_2m_min[i])}${deg}</span></div>`;
+  }).join("");
+  const hi = D.temperature_2m_max ? Math.round(D.temperature_2m_max[0]) : "", lo = D.temperature_2m_min ? Math.round(D.temperature_2m_min[0]) : "";
+  box.innerHTML = `<div class="wx-now"><div class="wx-ic">${wxIcon(cur.weather_code, cur.is_day)}</div><div class="wx-t">${Math.round(cur.temperature_2m)}${deg}</div>
+    <div><div class="wx-c">${esc(cond)}</div><div class="wx-s">Feels ${Math.round(cur.apparent_temperature)}${deg} · H ${hi}${deg} L ${lo}${deg}</div></div></div>
+    ${alert}<div class="wx-hours">${hours}</div><div class="wx-days">${days}</div>`;
+}
+setInterval(() => { if (Date.now() - wxLast > 10 * 60000) loadWeather(); }, 60000);
+$("wxp").onclick = () => macOpen({ kind: "weather-app" }, $("wxp"));
+
+/* =========================================================
+   QUICK ACTIONS (buttons that do things on the Mac)
+   ========================================================= */
+function renderActions() {
+  if (!panelOn("actions")) return;
+  const acts = prefs.actions || [];
+  const box = $("acts");
+  if (!acts.length) { box.innerHTML = `<div class="empty">Add buttons in ⚙︎ settings.</div>`; return; }
+  box.innerHTML = acts.map((a, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(a.icon || "▶︎")}</span><span class="al">${esc(a.label)}</span></button>`).join("");
+  box.querySelectorAll(".act").forEach(b => b.onclick = () => macOpen({ kind: "action", i: +b.dataset.i }, b));
+}
+
+/* settings: weather location and the action list */
+let wxDraft = null;
+function showWxCur() {
+  $("wxCur").textContent = wxDraft && wxDraft.lat != null ? "Showing weather for " + wxDraft.name + "." : "No location chosen yet.";
+}
+let wxTimer;
+$("wxSearch").oninput = () => {
+  clearTimeout(wxTimer);
+  wxTimer = setTimeout(async () => {
+    const q = $("wxSearch").value.trim(), res = $("wxRes");
+    if (q.length < 2) { res.innerHTML = ""; return; }
+    let d; try { d = await (await fetch("/api/geocode?q=" + encodeURIComponent(q))).json(); } catch (e) { return; }
+    res.innerHTML = "";
+    (d.results || []).forEach(r => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = r.name;
+      b.onclick = () => { wxDraft = { name: r.name, lat: r.lat, lon: r.lon }; res.innerHTML = ""; $("wxSearch").value = ""; showWxCur(); };
+      res.appendChild(b);
+    });
+    if (!(d.results || []).length) res.innerHTML = `<span class="hint">No matches.</span>`;
+  }, 350);
+};
+const ACT_PH = { app: "App name, e.g. Zoom", url: "https://…", shortcut: "Shortcut name, e.g. Office Lights On", folder: "~/Documents/Clients" };
+function actRow(a) {
+  const d = document.createElement("div"); d.className = "arow";
+  d.innerHTML = `<input class="ic" maxlength="8" aria-label="Icon (an emoji)" placeholder="⭐">
+    <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
+    <select class="tp" aria-label="Type"><option value="app">App</option><option value="url">Link</option><option value="shortcut">Shortcut</option><option value="folder">Folder</option><option value="system">Mac</option></select>
+    <span class="tw"></span>
+    <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
+  d.querySelector(".ic").value = a.icon || ""; d.querySelector(".lb").value = a.label || "";
+  const tp = d.querySelector(".tp"), tw = d.querySelector(".tw");
+  const drawTarget = (val) => {
+    if (tp.value === "system") {
+      tw.innerHTML = `<select class="tg" aria-label="What it does"><option value="lock">Lock screen</option><option value="screensaver">Start screen saver</option></select>`;
+      tw.querySelector(".tg").value = ["lock", "screensaver"].includes(val) ? val : "lock";
+    } else {
+      tw.innerHTML = `<input class="tg" spellcheck="false" aria-label="What it opens">`;
+      const i = tw.querySelector(".tg"); i.placeholder = ACT_PH[tp.value]; i.value = val || "";
+    }
+  };
+  tp.value = a.type || "app"; drawTarget(a.target);
+  tp.onchange = () => drawTarget("");
+  d.querySelector(".x").onclick = () => d.remove();
+  return d;
+}
+function loadActionRows() {
+  const box = $("actrows"); box.innerHTML = "";
+  (prefs.actions || []).forEach(a => box.appendChild(actRow(a)));
+}
+$("addAct").onclick = () => $("actrows").appendChild(actRow({ type: "app" }));
+function collectActions() {
+  return [...$("actrows").children].map(r => ({
+    icon: r.querySelector(".ic").value.trim(), label: r.querySelector(".lb").value.trim(),
+    type: r.querySelector(".tp").value, target: r.querySelector(".tg").value.trim() })).filter(a => a.target);
+}
+
 let draftBoxes = {};
 const cellsOf = ([x, y, w, h]) => { const c = []; for (let i = x; i < x + w; i++) for (let j = y; j < y + h; j++) c.push(i + "," + j); return c; };
 function overlaps(id, b) {
@@ -1230,6 +1409,9 @@ async function openSetup() {
   $("calSource").value = prefs.calSource || "links"; $("calSource").onchange();
   loadBadgeRows();
   loadNameRows();
+  wxDraft = prefs.weather && prefs.weather.lat != null ? Object.assign({}, prefs.weather) : null;
+  $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
+  loadActionRows();
   $("savedmsg").textContent = "";
   let cfg = { calendars: [] };
   try { cfg = await (await fetch("/api/config")).json(); } catch (e) {}
@@ -1261,6 +1443,8 @@ $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
   const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full",
     calSource: $("calSource").value,
+    weather: Object.assign({}, wxDraft || { name: "", lat: null, lon: null }, { units: $("wxUnits").value }),
+    actions: collectActions(),
     hiddenCals: document.querySelector("#applerows input[data-cal]")
       ? [...document.querySelectorAll("#applerows input[data-cal]")].filter(i => !i.checked).map(i => i.dataset.cal)
       : (prefs.hiddenCals || []),
