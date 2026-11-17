@@ -66,8 +66,11 @@
   .subhead { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 8px 0 2px; font-weight: 600; }
 
   /* ---------- messages ---------- */
-  .msgs { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
-  .msg { background: var(--panel2); border-radius: 14px; padding: 12px 14px; }
+  .msgs { flex: 1; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+  .msgs::-webkit-scrollbar { display: none; }
+  .msgs.fade { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent); }
+  .msgs.fade.end { -webkit-mask-image: none; mask-image: none; }
+  .msg { flex: none; background: var(--panel2); border-radius: 14px; padding: 12px 14px; }
   .msg .top { display: flex; gap: 8px; align-items: baseline; }
   .msg .who { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .msg .grp { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -880,16 +883,62 @@ async function loadMessages() {
       : `<div class="empty">Messages isn't set up on this Mac.</div>`;
     return;
   }
-  const list = (d.conversations || []).slice(0, 6);
+  const list = d.conversations || [];
   const unread = list.reduce((t, c) => t + c.unread, 0);
   $("msgcount").textContent = unread ? unread + " unread" : "";
+  const sig = JSON.stringify(list);
+  if (sig === msgSig) return;                // nothing new: leave the list (and where you scrolled) alone
+  msgSig = sig;
+  const keep = $("msgs").scrollTop;
   const first = n => String(n || "").split(" ")[0];
   $("msgs").innerHTML = list.length ? list.map(c => `
     <button class="msg conv ${c.unread ? "unread" : ""}" data-msg="${esc(c.open)}">
       <div class="top"><span class="who">${esc(c.name)}</span>${c.unread ? `<span class="ub">${c.unread}</span>` : ""}<span class="when">${esc(ago(c.time))}</span></div>
       <div class="thread">${c.lines.map(l => `<div class="bub ${l.mine ? "me" : "them"}">${c.group && !l.mine ? `<b>${esc(first(l.from))}</b> ` : ""}${esc(l.text)}</div>`).join("")}</div>
     </button>`).join("") : `<div class="empty">No messages.</div>`;
+  $("msgs").scrollTop = keep;
+  msgFade();
 }
+let msgSig = "";
+function msgFade() {
+  const el = $("msgs");
+  el.classList.toggle("fade", el.scrollHeight > el.clientHeight + 4);
+  el.classList.toggle("end", el.scrollTop + el.clientHeight >= el.scrollHeight - 4);
+}
+/* Swipe to scroll. The Edge's touch driver sends mouse-style drags, which don't scroll a
+   page by themselves, so drags are turned into scrolling here (with a little glide). A drag
+   never counts as a tap, so swiping doesn't open a conversation. */
+function dragScroll(el) {
+  let y0 = null, top0 = 0, moved = false, lastY = 0, lastT = 0, vel = 0, glide = 0, idle = 0;
+  el.addEventListener("pointerdown", e => {
+    cancelAnimationFrame(glide); y0 = e.clientY; top0 = el.scrollTop; moved = false; lastY = e.clientY; lastT = performance.now(); vel = 0;
+  });
+  el.addEventListener("pointermove", e => {
+    if (y0 === null) return;
+    const dy = e.clientY - y0;
+    if (!moved && Math.abs(dy) < 8) return;
+    moved = true;
+    el.scrollTop = top0 - dy;
+    const t = performance.now(); vel = (e.clientY - lastY) / Math.max(1, t - lastT); lastY = e.clientY; lastT = t;
+  });
+  const end = () => {
+    if (y0 === null) return;
+    y0 = null;
+    if (moved) {
+      let v = vel * 16;
+      const step = () => { if (Math.abs(v) < 0.5) return; el.scrollTop -= v; v *= 0.94; glide = requestAnimationFrame(step); };
+      glide = requestAnimationFrame(step);
+    }
+  };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end); el.addEventListener("pointerleave", end);
+  el.addEventListener("click", e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+  el.addEventListener("scroll", () => {
+    msgFade();
+    clearTimeout(idle);
+    idle = setTimeout(() => el.scrollTo({ top: 0, behavior: "smooth" }), 60000);   // back to the newest after a minute
+  });
+}
+dragScroll($("msgs"));
 loadMessages(); setInterval(loadMessages, 15000);
 // Tap a message: open that conversation in Messages on the main screen
 $("msgs").addEventListener("click", ev => {

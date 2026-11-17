@@ -296,10 +296,10 @@ def recent_messages(limit=12, include_hidden=False, include_mine=False):
     return {"ok": True, "messages": out}
 
 
-def conversations(max_chats=8, per_chat=4):
+def conversations(max_chats=20, per_chat=4):
     """Messages grouped like the Messages app: one entry per conversation,
     newest conversation first, with its last few lines (yours included)."""
-    d = recent_messages(limit=300, include_mine=True)
+    d = recent_messages(limit=600, include_mine=True)
     if not d.get("ok"):
         return d
     convs, order = {}, []
