@@ -985,7 +985,7 @@ def get_prefs():
                                 "units": "c" if w.get("units") == "c" else "f"}
         except (TypeError, ValueError):
             p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
-    if saved.get("theme") in ("default", "bridge", "hud", "pitwall", "daylight"):
+    if saved.get("theme") in ("default", "auto", "bridge", "hud", "pitwall", "daylight", "darkside", "lightside"):
         p["theme"] = saved["theme"]
     if isinstance(saved.get("hotkeys"), list):
         p["hotkeys"] = clean_hotkeys(saved["hotkeys"])

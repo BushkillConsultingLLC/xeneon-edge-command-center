@@ -23,13 +23,15 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 
 ![The layout editor: Calendar 2 × 4, Notifications 2 × 1 above Messages 2 × 3, Music 4 × 2, Reminders 2 × 2 and Claude 1 × 2](docs/layout-example.png)
 
-**Themes.** Pick a look in settings → Display → Theme. Each one changes colors, fonts and panel shapes; the fonts load from Google Fonts, with plain system fonts used if the Mac is offline.
+**Themes.** Pick a look in settings → Display → Theme. Each one changes colors, fonts and panel shapes, and **Match my Mac** switches between Default and Daylight with your Mac's light or dark Appearance; the fonts load from Google Fonts, with plain system fonts used if the Mac is offline.
 
 | Starship bridge | Holo HUD |
 |---|---|
 | ![Starship bridge theme: warm console colors with a colored rail on each panel](docs/theme-bridge.png) | ![Holo HUD theme: cyan outlines and corner brackets on black glass](docs/theme-hud.png) |
 | **Pit wall** | **Daylight** |
 | ![Pit wall theme: race-control telemetry look with red stripes](docs/theme-pitwall.png) | ![Daylight theme: a light look for bright rooms](docs/theme-daylight.png) |
+| **Dark side** | **Light side** |
+| ![Dark side theme: crimson glow and sharp cut corners on black](docs/theme-darkside.png) | ![Light side theme: warm sand and linen with a blue glow](docs/theme-lightside.png) |
 
 The themes are original designs, not copies of any film, show or racing series.
 

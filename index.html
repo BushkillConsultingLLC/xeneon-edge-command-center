@@ -206,7 +206,13 @@
   .hkpin .act { flex-direction: row; gap: 6px; padding: 4px 8px; } .hkpin .act .ai { font-size: 20px; } .hkpin .act .al { font-size: 13px; -webkit-line-clamp: 1; } .hkpin .act .ak { display: none; }
   .hkpin + .acts { margin-top: 10px; }
   /* App buttons keep one size: always room for three rows, so a short list doesn't balloon */
-  #hks { grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); align-content: stretch; }
+  #hks { grid-template-rows: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); align-content: stretch; container-type: size; container-name: hks; }
+  /* short tile: three rows get tight, so buttons go side-by-side icon and name */
+  @container hks (max-height: 230px) {
+    #hks .act { flex-direction: row; gap: 8px; padding: 4px 10px; justify-content: flex-start; }
+    #hks .act .ai { font-size: 20px; } #hks .act .ai img { width: 22px; height: 22px; }
+    #hks .act .al { font-size: 13px; -webkit-line-clamp: 1; text-align: left; } #hks .act .ak { display: none; }
+  }
   .panel[data-h="1"] #hks { grid-template-rows: 1fr; }
   .panel[data-h="1"] .hkpin { display: none; }
   .act .ak { font-size: 11px; color: var(--muted); font-weight: 500; }
@@ -292,6 +298,45 @@
   html[data-theme="pitwall"] .ntile.hot { box-shadow: inset 4px 0 0 var(--violet); } html[data-theme="pitwall"] .ntile.hot .n { color: var(--violet); }
   html[data-theme="pitwall"] .act, html[data-theme="pitwall"] .lt, html[data-theme="pitwall"] .ntile, html[data-theme="pitwall"] .msg { border-radius: 3px; }
   html[data-theme="pitwall"] .cb { border-radius: 6px; }
+
+
+  /* --- Dark side: crimson glow, black steel, sharp cut corners --- */
+  html[data-theme="darkside"] {
+    --bg: #030102; --panel: #0d0607; --panel2: #1a0a0c; --line: #3d1218;
+    --fg: #f5e9e9; --muted: #c08b8f; --dim: #6e3d42; --body2: #e6d3d4;
+    --red: #ff2436; --amber: #ff7a3c; --green: #ff5a6a; --blue: #ff4655; --violet: #d65bff; --claude: #ff2436;
+    --bub-them: #241013; --bub-them-fg: #f5e9e9; --bub-me: #a3101e; --lit: #ff4655; --lit-bg: #2a0b0f; --track: rgba(255, 36, 54, .12);
+    --r: 0px;
+    --font: "Exo 2", -apple-system, sans-serif; --font-display: "Michroma", "Exo 2", sans-serif; --font-label: "Michroma", sans-serif;
+  }
+  html[data-theme="darkside"] body { background: radial-gradient(ellipse at 50% 120%, #2a0207 0%, #030102 60%); }
+  html[data-theme="darkside"] .panel { clip-path: polygon(22px 0, 100% 0, 100% calc(100% - 22px), calc(100% - 22px) 100%, 0 100%, 0 22px);
+    border-top: 2px solid var(--red); box-shadow: inset 0 14px 30px -18px rgba(255, 36, 54, .55); }
+  html[data-theme="darkside"] .label { color: var(--red); font-size: 11px; letter-spacing: .3em; font-weight: 400; text-shadow: 0 0 10px rgba(255, 36, 54, .7); }
+  html[data-theme="darkside"] .clock .t { font-size: 54px; font-weight: 400; letter-spacing: .06em; color: #fff; text-shadow: 0 0 12px rgba(255, 36, 54, .9), 0 0 32px rgba(255, 36, 54, .5); }
+  html[data-theme="darkside"] .pill { border-radius: 0; background: transparent; border: 1px solid var(--red); color: var(--red); }
+  html[data-theme="darkside"] .act, html[data-theme="darkside"] .lt, html[data-theme="darkside"] .ntile, html[data-theme="darkside"] .msg, html[data-theme="darkside"] .wx-h, html[data-theme="darkside"] .task, html[data-theme="darkside"] .next {
+    border-radius: 0; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+  html[data-theme="darkside"] .cb { border-radius: 0; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); }
+  html[data-theme="darkside"] .ntile.hot .n, html[data-theme="darkside"] .wx-t { text-shadow: 0 0 14px rgba(255, 36, 54, .8); }
+
+  /* --- Light side: warm sand and linen, soft shapes, a blue-green glow --- */
+  html[data-theme="lightside"] {
+    --bg: #d9cbb2; --panel: #f4ecde; --panel2: #e9dcc6; --line: #cdb994;
+    --fg: #2a2016; --muted: #6f5b44; --dim: #a08b6e; --body2: #3a2e22;
+    --blue: #1f8fff; --green: #2fb36a; --amber: #a86a1f; --red: #c8463a; --violet: #6a7fd8; --claude: #8a5a2e;
+    --bub-them: #e3d5bd; --bub-them-fg: #2a2016; --bub-me: #1f7fe0; --lit: #1f8fff; --lit-bg: #dceaf7; --track: rgba(60, 40, 20, .1);
+    --r: 22px;
+    --font: "Exo 2", -apple-system, sans-serif; --font-display: "Michroma", "Exo 2", sans-serif; --font-label: "Michroma", sans-serif;
+  }
+  html[data-theme="lightside"] body { background: linear-gradient(180deg, #e3d6bf 0%, #cdbd9f 100%); }
+  html[data-theme="lightside"] .panel { box-shadow: 0 2px 0 rgba(120, 90, 50, .15), 0 10px 24px rgba(90, 60, 30, .12); }
+  html[data-theme="lightside"] .label { color: #7a5a35; font-size: 11px; letter-spacing: .28em; font-weight: 400; }
+  html[data-theme="lightside"] .label { position: relative; padding-bottom: 9px; }
+  html[data-theme="lightside"] .label::after { content: ""; position: absolute; left: 0; bottom: 0; width: 64px; height: 3px; border-radius: 3px;
+    background: var(--blue); box-shadow: 0 0 8px rgba(31, 143, 255, .8), 0 0 18px rgba(31, 143, 255, .45); }
+  html[data-theme="lightside"] .clock .t { font-size: 54px; font-weight: 400; letter-spacing: .06em; color: #2a2016; }
+  html[data-theme="lightside"] .pill { background: #e2d2b6; color: #6f5b44; }
 
   /* --- Daylight: a light look for bright rooms --- */
   html[data-theme="daylight"] {
@@ -661,8 +706,8 @@
       <summary><span class="car"></span>Display<span class="sub">Full screen, restart</span></summary>
       <div class="secb">
     <div class="fld"><label for="theme">Theme</label>
-      <select id="theme"><option value="default">Default</option><option value="bridge">Starship bridge</option><option value="hud">Holo HUD</option><option value="pitwall">Pit wall</option><option value="daylight">Daylight</option></select>
-      <div class="hint">Changes the Edge's colors, fonts and panel shapes. This settings page keeps the default look.</div></div>
+      <select id="theme"><option value="default">Default</option><option value="auto">Match my Mac (light or dark)</option><option value="bridge">Starship bridge</option><option value="hud">Holo HUD</option><option value="pitwall">Pit wall</option><option value="darkside">Dark side</option><option value="lightside">Light side</option><option value="daylight">Daylight</option></select>
+      <div class="hint">Changes the Edge's colors, fonts and panel shapes. "Match my Mac" switches between Default and Daylight with your Mac's Appearance setting. This settings page keeps the default look.</div></div>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
       </div>
@@ -702,10 +747,15 @@ const THEME_FONTS = {
   bridge: "family=Oswald:wght@400;500;600&family=Barlow:wght@400;500;600;700",
   hud: "family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono",
   pitwall: "family=Titillium+Web:ital,wght@0,400;0,600;0,700;1,700",
+  darkside: "family=Michroma&family=Exo+2:wght@400;500;600;700",
+  lightside: "family=Michroma&family=Exo+2:wght@400;500;600;700",
 };
+const macDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+if (macDark && macDark.addEventListener) macDark.addEventListener("change", () => applyTheme());
 function applyTheme() {
   if (SETTINGS_PAGE) return;
-  const t = prefs.theme || "default";
+  let t = prefs.theme || "default";
+  if (t === "auto") t = macDark && !macDark.matches ? "daylight" : "default";   // follows the Mac's Appearance setting
   if (t === "default") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
   if (THEME_FONTS[t] && !document.getElementById("font-" + t)) {   // fonts load once; offline, the fallbacks are used
     const l = document.createElement("link"); l.id = "font-" + t; l.rel = "stylesheet";
