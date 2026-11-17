@@ -658,6 +658,30 @@ async function postConfig(body) {
   if (r.layout) layout = r.layout;
   return r;
 }
+/* Settings page: keep up with changes saved elsewhere. Untouched, it quietly reloads;
+   with your edits in progress, it warns instead of throwing them away. */
+let setDirty = false;
+async function reloadSettings() {
+  const c = await (await fetch("/api/config")).json();
+  layout = c.layout || layout; prefs = c.prefs || prefs; hasGovee = !!c.hasGoveeKey; cfgRev = c.rev;
+  await openSetup(); setDirty = false;
+}
+if (SETTINGS_PAGE) {
+  const sheet = document.querySelector("#setup .sheet");
+  const mark = e => { if (!e.target.closest("summary, .secctl, #save, #cancel")) setDirty = true; };
+  ["input", "change"].forEach(t => sheet.addEventListener(t, mark));
+  sheet.addEventListener("click", e => { if (e.target.closest("button") ) mark(e); });
+  sheet.addEventListener("pointerup", e => { if (e.target.closest("#led")) setDirty = true; });
+  setInterval(async () => {
+    try {
+      const c = await (await fetch("/api/config")).json();
+      if (cfgRev < 0 || c.rev === cfgRev) return;
+      if (!setDirty) { await reloadSettings(); return; }
+      $("savedmsg").style.color = "var(--amber)";
+      $("savedmsg").textContent = "Settings were changed somewhere else. Saving now won't overwrite them; reload this page to see the latest.";
+    } catch (e) {}
+  }, 5000);
+}
 // The Edge checks for changes saved from the settings page on the main screen
 async function watchConfig() {
   if (SETTINGS_PAGE) return;
@@ -2009,11 +2033,19 @@ $("save").onclick = async () => {
       body.nameOverrides = collectOverrides();
       body.hiddenSenders = [...document.querySelectorAll("#namerows input[data-hide]:checked")].map(i => i.dataset.hide);
     }
+    if (SETTINGS_PAGE) body.baseRev = cfgRev;
     const r = await postConfig(body);
+    if (r.conflict) {
+      // Something else saved since this page loaded: load the latest instead of overwriting it
+      await reloadSettings();
+      $("savedmsg").textContent = "Not saved: settings changed somewhere else since this page opened. The latest is loaded now, so make your change again.";
+      $("savedmsg").style.color = "var(--amber)";
+      return;
+    }
     cfgRev = r.rev != null ? r.rev : cfgRev;
   } catch (e) { layout = newLayout; }
   Object.assign(prefs, newPrefs);
-  if (SETTINGS_PAGE) { await openSetup(); $("savedmsg").textContent = "Saved. The Edge updates within a few seconds."; return; }
+  if (SETTINGS_PAGE) { await openSetup(); setDirty = false; $("savedmsg").style.color = ""; $("savedmsg").textContent = "Saved. The Edge updates within a few seconds."; return; }
   $("setup").classList.remove("show");
   if (oldCid !== prefs.spotifyClientId) ["spAccess", "spRefresh", "spExpires"].forEach(store.del);
   applyLayout(); loadCalendars();

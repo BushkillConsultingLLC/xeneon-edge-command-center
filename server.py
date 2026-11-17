@@ -1829,6 +1829,10 @@ class Handler(SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(min(n, 100000)) or b"{}")
             cfg = load_config()
+            # A settings tab says which version it started from; if something else saved since
+            # (the Edge, another tab, Claude), refuse rather than put back older settings.
+            if "baseRev" in body and int(body.get("baseRev") or 0) != int(cfg.get("rev", 0)):
+                return self._json({"ok": False, "conflict": True, "rev": int(cfg.get("rev", 0))}, 409)
             if "calendars" in body:
                 cals = []
                 for c in body.get("calendars", [])[:12]:
