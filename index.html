@@ -75,6 +75,14 @@
   .msg .body { font-size: 16px; color: #cfd4da; margin-top: 4px; line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .msg.unread { box-shadow: inset 4px 0 0 var(--blue); }
+  .conv .ub { background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; border-radius: 99px; padding: 1px 7px; margin-left: 2px; }
+  .msg.unread.conv .who::after { display: none; }
+  .thread { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+  .bub { font-size: 14px; line-height: 1.3; padding: 4px 10px; border-radius: 14px; max-width: 86%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bub.them { align-self: flex-start; background: #3a3d44; color: #e9ebee; border-bottom-left-radius: 5px; }
+  .bub.me { align-self: flex-end; background: #0a84ff; color: #fff; border-bottom-right-radius: 5px; }
+  .bub b { font-weight: 600; color: var(--muted); }
+  .panel[data-h="1"] .bub:not(:last-child) { display: none; }
   .msg.unread .who::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--blue);
     border-radius: 50%; margin-left: 8px; vertical-align: middle; }
 
@@ -91,6 +99,7 @@
 
   /* ---------- compact panels (half-height zones, narrow zones) ---------- */
   @container panel (max-height: 420px) {
+    .thread .bub:nth-last-child(n+3) { display: none; } .thread { margin-top: 4px; }
     .clock { margin-bottom: 8px; } .clock .t { font-size: 44px; } .clock .d { font-size: 16px; }
     .next { padding: 10px 14px; margin-bottom: 8px; } .next .title { font-size: 21px; margin: 3px 0 2px; } .next .meta { font-size: 14px; }
     .join { font-size: 17px; padding: 10px 18px; min-height: 44px; }
@@ -871,13 +880,14 @@ async function loadMessages() {
       : `<div class="empty">Messages isn't set up on this Mac.</div>`;
     return;
   }
-  const list = d.messages.slice(0, 6);
-  const unread = d.messages.filter(m => m.unread).length;
+  const list = (d.conversations || []).slice(0, 6);
+  const unread = list.reduce((t, c) => t + c.unread, 0);
   $("msgcount").textContent = unread ? unread + " unread" : "";
-  $("msgs").innerHTML = list.length ? list.map(m => `
-    <button class="msg ${m.unread ? "unread" : ""}" data-msg="${esc(m.id)}">
-      <div class="top"><span class="who">${esc(m.from)}</span>${m.group ? `<span class="grp">in ${esc(m.group)}</span>` : ""}<span class="when">${esc(ago(m.time))}</span></div>
-      <div class="body">${esc(m.text)}</div>
+  const first = n => String(n || "").split(" ")[0];
+  $("msgs").innerHTML = list.length ? list.map(c => `
+    <button class="msg conv ${c.unread ? "unread" : ""}" data-msg="${esc(c.open)}">
+      <div class="top"><span class="who">${esc(c.name)}</span>${c.unread ? `<span class="ub">${c.unread}</span>` : ""}<span class="when">${esc(ago(c.time))}</span></div>
+      <div class="thread">${c.lines.map(l => `<div class="bub ${l.mine ? "me" : "them"}">${c.group && !l.mine ? `<b>${esc(first(l.from))}</b> ` : ""}${esc(l.text)}</div>`).join("")}</div>
     </button>`).join("") : `<div class="empty">No messages.</div>`;
 }
 loadMessages(); setInterval(loadMessages, 15000);

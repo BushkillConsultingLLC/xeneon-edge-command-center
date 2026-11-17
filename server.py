@@ -198,7 +198,7 @@ def blocked_handles():
     return found
 
 
-def recent_messages(limit=12, include_hidden=False):
+def recent_messages(limit=12, include_hidden=False, include_mine=False):
     if not os.path.exists(CHAT_DB):
         return {"ok": False, "error": "no_db"}
     try:
@@ -225,17 +225,16 @@ def recent_messages(limit=12, include_hidden=False):
         rows = con.execute("""
             SELECT m.ROWID, m.date, m.text, m.attributedBody, h.id,
                    c.display_name, c.chat_identifier, m.is_read,
-                   m.cache_has_attachments
+                   m.cache_has_attachments, c.ROWID, m.is_from_me
             FROM message m
             JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
             JOIN chat c ON c.ROWID = cmj.chat_id
             LEFT JOIN handle h ON h.ROWID = m.handle_id
-            WHERE m.is_from_me = 0
-              AND m.associated_message_type = 0
+            WHERE %s m.associated_message_type = 0
               AND m.item_type = 0
               %s
             ORDER BY m.date DESC
-            LIMIT ?""" % not_deleted, (limit * 4,)).fetchall()
+            LIMIT ?""" % ("" if include_mine else "m.is_from_me = 0 AND", not_deleted), (limit * 4,)).fetchall()
     except sqlite3.DatabaseError as e:
         con.close()
         return {"ok": False, "error": "no_access", "detail": str(e)}
@@ -246,12 +245,12 @@ def recent_messages(limit=12, include_hidden=False):
     blocked = blocked_handles()
     hidden = set(load_config().get("hiddenSenders") or [])
     out, seen = [], set()
-    for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att in rows:
+    for rowid, date, text, attr, handle, group_name, chat_id, is_read, has_att, chat_row, mine in rows:
         if rowid in seen:
             continue
         if norm_handle(handle) in blocked or (not group_name and norm_handle(chat_id) in blocked):
             continue
-        if not include_hidden and norm_handle(handle) in hidden:
+        if not include_hidden and (norm_handle(handle) in hidden or (not group_name and norm_handle(chat_id) in hidden)):
             continue
         seen.add(rowid)
         body = text or text_from_attributed(attr)
@@ -263,14 +262,21 @@ def recent_messages(limit=12, include_hidden=False):
         # Apple stores nanoseconds since 2001-01-01 (older DBs: seconds)
         secs = date / 1e9 if date and date > 1e12 else (date or 0)
         unix = secs + 978307200
-        key = norm_handle(handle)
-        c = contacts.get(key)
-        if overrides.get(key):
+        key = norm_handle(handle) if not mine else ""
+        c = contacts.get(key) if key else None
+        if mine:
+            sender = "You"
+        elif overrides.get(key):
             sender = overrides[key]
         elif c:
             sender = c["nick"] or (c["first"] if name_style == "first" else c["full"])
         else:
             sender = handle or "Unknown"
+        # who the conversation is with (for a 1:1 chat, the other person even on your own messages)
+        other = norm_handle(chat_id) if not group_name else ""
+        oc = contacts.get(other) if other else None
+        chat_name = group_name or overrides.get(other) or (
+            (oc["nick"] or (oc["first"] if name_style == "first" else oc["full"])) if oc else (chat_id or sender))
         out.append({
             "id": rowid,
             "from": sender,
@@ -279,12 +285,45 @@ def recent_messages(limit=12, include_hidden=False):
             "group": group_name or None,
             "text": body[:400],
             "time": int(unix * 1000),
-            "unread": not is_read,
+            "unread": (not is_read) and not mine,
             "hidden": norm_handle(handle) in hidden,
+            "mine": bool(mine),
+            "chat": chat_row,
+            "chatName": chat_name,
         })
         if len(out) >= limit:
             break
     return {"ok": True, "messages": out}
+
+
+def conversations(max_chats=8, per_chat=4):
+    """Messages grouped like the Messages app: one entry per conversation,
+    newest conversation first, with its last few lines (yours included)."""
+    d = recent_messages(limit=300, include_mine=True)
+    if not d.get("ok"):
+        return d
+    convs, order = {}, []
+    for m in d["messages"]:                       # newest first
+        cv = convs.get(m["chat"])
+        if cv is None:
+            if len(order) >= max_chats:
+                continue
+            cv = convs[m["chat"]] = {"chat": m["chat"], "name": m["chatName"], "group": bool(m["group"]),
+                                     "time": m["time"], "open": m["id"], "unread": 0, "lines": [], "replied": False}
+            order.append(m["chat"])
+        if m["mine"]:
+            cv["replied"] = True                  # anything older than your reply counts as answered
+        elif m["unread"] and not cv["replied"]:
+            cv["unread"] += 1
+        if len(cv["lines"]) < per_chat:
+            cv["lines"].append({"mine": m["mine"], "from": m["from"], "text": m["text"], "time": m["time"]})
+    out = []
+    for k in order:
+        cv = convs[k]
+        cv["lines"].reverse()                     # oldest first, like a thread
+        cv.pop("replied", None)
+        out.append(cv)
+    return {"ok": True, "conversations": out}
 
 
 # ---------------- opening things on the Mac ----------------
@@ -1561,7 +1600,7 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(data)
             return
         if p == "/api/messages":
-            return self._json(recent_messages())
+            return self._json(conversations())
         if p == "/api/apple-cal":
             q = parse_qs(u.query)
             return self._json(apple_calendar(force=q.get("force") == ["1"], include_hidden=q.get("all") == ["1"]))
