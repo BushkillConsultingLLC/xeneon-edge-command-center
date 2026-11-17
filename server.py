@@ -546,9 +546,11 @@ def clean_hotkeys(v):
         for b in (prof.get("buttons") or [])[:16]:
             if not isinstance(b, dict):
                 continue
-            kind = "text" if b.get("kind") == "text" else "keys"
-            val = str(b.get("value", ""))[:1000 if kind == "text" else 40]
+            kind = b.get("kind") if b.get("kind") in ("text", "menu") else "keys"
+            val = str(b.get("value", ""))[:1000 if kind == "text" else 200 if kind == "menu" else 40]
             if not val.strip() or (kind == "keys" and not parse_keys(val)):
+                continue
+            if kind == "menu" and not (1 < len([x for x in val.split(" > ") if x.strip()]) <= 3):
                 continue
             btns.append({"label": str(b.get("label", "")).strip()[:24] or val[:24], "icon": str(b.get("icon", "")).strip()[:8],
                          "kind": kind, "value": val, "enter": bool(b.get("enter"))})
@@ -605,6 +607,74 @@ def hotkey_profile(app, title):
     return None
 
 
+MENU_SCRIPT = r'''
+on run argv
+set out to ""
+tell application "System Events" to tell (first process whose name is (item 1 of argv))
+  repeat with mb in (menu bar items of menu bar 1)
+    set mt to name of mb
+    try
+      repeat with mi in (menu items of menu 1 of mb)
+        try
+          set n to name of mi
+          if n is not missing value and n is not "" then
+            set c to ""
+            set m to ""
+            set k to ""
+            try
+              set c to value of attribute "AXMenuItemCmdChar" of mi
+            end try
+            try
+              set m to value of attribute "AXMenuItemCmdModifiers" of mi
+            end try
+            try
+              set k to value of attribute "AXMenuItemCmdVirtualKey" of mi
+            end try
+            set out to out & mt & tab & n & tab & c & tab & m & tab & k & linefeed
+          end if
+        end try
+      end repeat
+    end try
+  end repeat
+end tell
+return out
+end run'''
+
+
+def app_menus(app):
+    """Every item in an app's menu bar, with its keyboard shortcut when it has one.
+    The app has to be running; reading menus needs Accessibility for Terminal."""
+    app = str(app or "").strip()
+    if not re.fullmatch(r"[\w .&+'()-]{1,40}", app):
+        return {"ok": False, "error": "bad_app"}
+    try:
+        r = subprocess.run(["/usr/bin/osascript", "-e", MENU_SCRIPT, app], capture_output=True, text=True, timeout=20)
+    except Exception:
+        return {"ok": False, "error": "timeout"}
+    if r.returncode != 0:
+        return {"ok": False, "error": "not_running" if "-1719" in r.stderr or "Invalid index" in r.stderr else "failed",
+                "detail": r.stderr[:200]}
+    rev = {v: k for k, v in KEY_CODES.items() if k not in ("enter", "esc")}
+    items = []
+    for line in r.stdout.splitlines():
+        p = line.split("\t")
+        if len(p) < 5 or p[0] in ("Apple", "") or p[1] in ("missing value",):
+            continue
+        menu, name, ch, mods, vk = [x if x != "missing value" else "" for x in p[:5]]
+        keys = ""
+        key = ch.lower() if ch and len(ch) == 1 and ch.isprintable() and ch != " " else ""
+        if not key and vk.isdigit() and int(vk) in rev:
+            key = rev[int(vk)]
+        if key:
+            m = int(mods) if mods.lstrip("-").isdigit() else 0
+            mod = [x for x, on in (("cmd", not (m & 8)), ("ctrl", m & 4), ("option", m & 2), ("shift", m & 1)) if on]
+            keys = "+".join(mod + [key])
+            if not parse_keys(keys):
+                keys = ""
+        items.append({"menu": menu, "name": name, "keys": keys})
+    return {"ok": True, "app": app, "items": items[:400]}
+
+
 def hotkey_view():
     f = front_app()
     p = hotkey_profile(f["app"], f["title"])
@@ -622,7 +692,15 @@ def run_hotkey(i, expect):
     if expect and expect != b["label"]:
         return False                                  # the app changed under the finger: don't press the wrong thing
     focus = 'tell application "System Events" to set frontmost of (first process whose unix id is %d) to true\ndelay 0.15\n' % f["pid"]
-    if b["kind"] == "keys":
+    if b["kind"] == "menu":
+        # press the menu item itself: works even when it has no keyboard shortcut
+        parts = [x.strip() for x in b["value"].split(" > ") if x.strip()]
+        q = lambda x: json.dumps(x, ensure_ascii=False)
+        target = "menu item %s of menu 1 of menu bar item %s of menu bar 1" % (q(parts[-1]), q(parts[0]))
+        if len(parts) == 3:
+            target = "menu item %s of menu 1 of menu item %s of menu 1 of menu bar item %s of menu bar 1" % (q(parts[2]), q(parts[1]), q(parts[0]))
+        script = focus + 'tell application "System Events" to tell (first process whose unix id is %d) to click %s' % (f["pid"], target)
+    elif b["kind"] == "keys":
         k = parse_keys(b["value"])
         if not k:
             return False
@@ -1613,6 +1691,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(reminders_shown(force=q.get("force") == ["1"], show_all=q.get("all") == ["1"]))
         if p == "/api/hotkeys":
             return self._json(hotkey_view())
+        if p == "/api/menus":
+            return self._json(app_menus(parse_qs(u.query).get("app", [""])[0]))
         if p == "/api/lights":
             return self._json(lights_view(show_all=parse_qs(u.query).get("all") == ["1"]))
         if p == "/api/weather":

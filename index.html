@@ -206,6 +206,12 @@
   .hkhead input, .hkrow input, .hkrow select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 10px; font-size: 15px; width: 100%; }
   .hkrow { display: grid; grid-template-columns: 64px 1fr 120px 1.5fr 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
   .hkrow .icb { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; font-size: 20px; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 42px; }
+  .mpick { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .mpick .mq { width: 100%; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); padding: 8px 10px; font-size: 14px; margin-bottom: 8px; }
+  .mpick .ml { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+  .mpick .mi { display: flex; justify-content: space-between; gap: 10px; background: none; border: 0; border-radius: 6px; padding: 6px 8px; font-size: 14px; color: var(--fg); text-align: left; }
+  .mpick .mi:hover { background: var(--panel2); } .mpick .mi b { font-weight: 600; }
+  .mpick .mk { color: var(--muted); white-space: nowrap; } .mpick .mi.added .mk { color: var(--green); }
   .hkval { display: flex; gap: 6px; align-items: center; }
   .hkval .rec { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
   .hkval .rec.on { background: var(--red); color: #fff; }
@@ -1494,7 +1500,7 @@ async function loadHotkeys() {
   pill.innerHTML = d.app ? (d.generic ? "" : `<img src="${esc(iconUrl({ type: "app", target: d.app }))}" alt="" onerror="this.remove()">`) + esc(d.app) : "";
   const box = $("hks");
   if (!d.buttons.length) { box.innerHTML = `<div class="empty">No buttons for ${esc(d.app || "this app")}. Add some in ⚙︎ settings → Hot Keys.</div>`; return; }
-  box.innerHTML = d.buttons.map((b, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(b.icon || (b.kind === "text" ? "💬" : "⌨️"))}</span><span class="al">${esc(b.label)}</span><span class="ak">${b.kind === "text" ? "types text" : esc(prettyKeys(b.value))}</span></button>`).join("");
+  box.innerHTML = d.buttons.map((b, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(b.icon || (b.kind === "text" ? "💬" : b.kind === "menu" ? "☰" : "⌨️"))}</span><span class="al">${esc(b.label)}</span><span class="ak">${b.kind === "text" ? "types text" : b.kind === "menu" ? "menu" : esc(prettyKeys(b.value))}</span></button>`).join("");
   box.querySelectorAll(".act").forEach(el => el.onclick = () => {
     const b = hkData.buttons[+el.dataset.i];
     macOpen({ kind: "hotkey", i: +el.dataset.i, label: b.label }, el);
@@ -1519,13 +1525,16 @@ function hkBtnRow(b) {
   const d = document.createElement("div"); d.className = "hkrow";
   d.innerHTML = `<button type="button" class="icb" aria-label="Icon: click to choose"></button>
     <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
-    <select class="kd" aria-label="What it does"><option value="keys">Keys</option><option value="text">Type text</option></select>
+    <select class="kd" aria-label="What it does"><option value="keys">Keys</option><option value="text">Type text</option><option value="menu">Menu item</option></select>
     <span class="hkval"></span>
     <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
   d.querySelector(".lb").value = b.label || "";
   const kd = d.querySelector(".kd"), hv = d.querySelector(".hkval");
   const draw = val => {
-    if (kd.value === "text") {
+    if (kd.value === "menu") {
+      hv.innerHTML = `<input class="vv" maxlength="200" spellcheck="false" placeholder="Menu > Item, e.g. File > New Chat" aria-label="Menu item">`;
+      hv.querySelector(".vv").value = val || "";
+    } else if (kd.value === "text") {
       hv.innerHTML = `<input class="vv" maxlength="1000" placeholder="Text to type, e.g. Summarize this" aria-label="Text to type"><label><input type="checkbox" class="en"> Return</label>`;
       hv.querySelector(".vv").value = val || ""; hv.querySelector(".en").checked = !!b.enter;
     } else {
@@ -1545,7 +1554,7 @@ function hkBtnRow(b) {
       };
     }
   };
-  kd.value = b.kind === "text" ? "text" : "keys"; draw(b.value);
+  kd.value = ["text", "menu"].includes(b.kind) ? b.kind : "keys"; draw(b.value);
   kd.onchange = () => draw("");
   const ib = d.querySelector(".icb"); ib.onclick = () => openIconPicker(ib);
   ib.dataset.icon = b.icon || ""; ib.innerHTML = b.icon ? esc(b.icon) : `<span style="opacity:.4">⌨️</span>`;
@@ -1557,11 +1566,33 @@ function hkProfCard(p) {
   c.innerHTML = `<div class="hkhead"><input class="ha" maxlength="40" placeholder="App name, e.g. Google Chrome (or * for any app)" aria-label="App name">
     <input class="ht" maxlength="40" placeholder="Only when the window title contains… (optional)" aria-label="Window title contains">
     <button class="x" type="button" title="Remove this app" aria-label="Remove this app">✕</button></div><div class="hkbtns"></div>
-    <button class="ghost addb" type="button" style="padding:7px 12px;font-size:14px">+ Add a button</button>`;
+    <button class="ghost addb" type="button" style="padding:7px 12px;font-size:14px">+ Add a button</button>
+    <button class="ghost fromm" type="button" style="padding:7px 12px;font-size:14px;margin-left:6px">+ From its menus</button>
+    <div class="mpick" hidden><input class="mq" placeholder="Search this app's menus, e.g. new chat" aria-label="Search menus"><div class="ml"></div></div>`;
   c.querySelector(".ha").value = p.app || ""; c.querySelector(".ht").value = p.title || "";
   const list = c.querySelector(".hkbtns");
   (p.buttons || []).forEach(b => list.appendChild(hkBtnRow(b)));
   c.querySelector(".addb").onclick = () => list.appendChild(hkBtnRow({ kind: "keys" }));
+  const mp = c.querySelector(".mpick"), ml = c.querySelector(".ml"), mq = c.querySelector(".mq");
+  c.querySelector(".fromm").onclick = async () => {
+    const app = c.querySelector(".ha").value.trim();
+    mp.hidden = false;
+    if (!app || app === "*") { ml.innerHTML = `<div class="hint">Type the app's name above first (it has to be open on your Mac).</div>`; return; }
+    ml.innerHTML = `<div class="hint">Reading ${esc(app)}'s menus… this takes a few seconds.</div>`;
+    let d; try { d = await (await fetch("/api/menus?app=" + encodeURIComponent(app))).json(); } catch (e) { d = { ok: false }; }
+    if (!d.ok) { ml.innerHTML = `<div class="hint">${d.error === "not_running" ? esc(app) + " needs to be open to read its menus. Open it and try again." : "Couldn't read " + esc(app) + "'s menus. Check the app's exact name (as it shows in the menu bar)."}</div>`; return; }
+    const draw = () => {
+      const q = mq.value.trim().toLowerCase();
+      const hits = d.items.filter(i => !q || (i.menu + " " + i.name).toLowerCase().includes(q)).slice(0, 60);
+      ml.innerHTML = hits.map((i, n) => `<button type="button" class="mi" data-n="${d.items.indexOf(i)}"><span>${esc(i.menu)} › <b>${esc(i.name)}</b></span><span class="mk">${i.keys ? esc(prettyKeys(i.keys)) : ""}</span></button>`).join("") || `<div class="hint">No menu items match.</div>`;
+      ml.querySelectorAll(".mi").forEach(b => b.onclick = () => {
+        const it = d.items[+b.dataset.n];
+        list.appendChild(hkBtnRow({ label: it.name.slice(0, 24), kind: "menu", value: it.menu + " > " + it.name }));
+        b.classList.add("added"); b.querySelector(".mk").textContent = "Added ✓";
+      });
+    };
+    mq.oninput = draw; draw(); mq.focus();
+  };
   c.querySelector(".hkhead .x").onclick = () => c.remove();
   return c;
 }
