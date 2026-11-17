@@ -11,10 +11,14 @@
     --green: #1ed760; --amber: #f5b942; --red: #f2555a; --blue: #6aa8ff; --violet: #c3a6ff;
     --claude: #d97757;
     --r: 18px;
+    --body2: #cfd4da; --bub-them: #3a3d44; --bub-them-fg: #e9ebee; --bub-me: #0a84ff;
+    --lit: #ffd166; --lit-bg: #3a3220; --track: rgba(255,255,255,.06);
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    --font-display: var(--font); --font-label: var(--font);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+    font-family: var(--font);
     -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
   .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
@@ -22,7 +26,7 @@
   .panel.off { display: none; }
   .panel { container-type: size; container-name: panel; background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
     display: flex; flex-direction: column; position: relative; overflow: hidden; }
-  .label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600;
+  .label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; font-family: var(--font-label);
     display: flex; align-items: center; gap: 10px; }
   .label .sp { flex: 1; }
   .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
@@ -35,7 +39,7 @@
 
   /* ---------- calendar ---------- */
   .clock { display: flex; align-items: baseline; gap: 16px; margin-bottom: 14px; }
-  .clock .t { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+  .clock .t { font-size: 64px; font-weight: 700; letter-spacing: -.02em; line-height: 1; font-family: var(--font-display); }
   .clock .d { font-size: 19px; color: var(--muted); }
   .next { background: var(--panel2); border-radius: 14px; padding: 16px 18px; margin-bottom: 14px; border-left: 5px solid var(--blue); cursor: pointer; position: relative; }
   .join { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: var(--green); color: #000; border: 0; border-radius: 12px;
@@ -75,15 +79,15 @@
   .msg .who { font-weight: 700; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .msg .grp { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .msg .when { margin-left: auto; color: var(--dim); font-size: 13px; white-space: nowrap; }
-  .msg .body { font-size: 16px; color: #cfd4da; margin-top: 4px; line-height: 1.35;
+  .msg .body { font-size: 16px; color: var(--body2); margin-top: 4px; line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .msg.unread { box-shadow: inset 4px 0 0 var(--blue); }
   .conv .ub { background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; border-radius: 99px; padding: 1px 7px; margin-left: 2px; }
   .msg.unread.conv .who::after { display: none; }
   .thread { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
   .bub { font-size: 14px; line-height: 1.3; padding: 4px 10px; border-radius: 14px; max-width: 86%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bub.them { align-self: flex-start; background: #3a3d44; color: #e9ebee; border-bottom-left-radius: 5px; }
-  .bub.me { align-self: flex-end; background: #0a84ff; color: #fff; border-bottom-right-radius: 5px; }
+  .bub.them { align-self: flex-start; background: var(--bub-them); color: var(--bub-them-fg); border-bottom-left-radius: 5px; }
+  .bub.me { align-self: flex-end; background: var(--bub-me); color: #fff; border-bottom-right-radius: 5px; }
   .bub b { font-weight: 600; color: var(--muted); }
   .panel[data-h="1"] .bub:not(:last-child) { display: none; }
   .msg.unread .who::after { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--blue);
@@ -179,12 +183,12 @@
   .lt { position: relative; background: var(--panel2); border: 0; border-radius: 14px; padding: 10px 12px 18px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; text-align: left; color: var(--fg); min-height: 0; overflow: hidden; touch-action: none; }
   .lt .ln { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
   .lt .ls { font-size: 13px; color: var(--muted); margin-top: 3px; }
-  .lt.on { background: #3a3220; box-shadow: inset 0 0 0 2px #ffd166; }
-  .lt.on .ls { color: #ffd166; }
+  .lt.on { background: var(--lit-bg); box-shadow: inset 0 0 0 2px var(--lit); }
+  .lt.on .ls { color: var(--lit); }
   .lt.off .ln::before { content: ""; }
   .lt.offline { opacity: .45; }
-  .lt .lb { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: rgba(255,255,255,.06); }
-  .lt .lb i { display: block; height: 100%; background: #ffd166; opacity: .8; }
+  .lt .lb { position: absolute; left: 0; right: 0; bottom: 0; height: 12px; background: var(--track); }
+  .lt .lb i { display: block; height: 100%; background: var(--lit); opacity: .8; }
   .lt.off .lb i { opacity: .25; }
   .lt:active { transform: scale(.97); }
   .panel[data-h="1"] .lts { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-template-rows: 1fr; grid-auto-rows: 1fr; margin-top: 6px; gap: 6px; }
@@ -221,6 +225,79 @@
   .hkval .rec.on { background: var(--red); color: #fff; }
   .hkval label { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); white-space: nowrap; }
   .hkval label input { width: 18px; height: 18px; padding: 0; }
+
+
+  /* =====================================================================
+     THEMES (original looks; the settings page always stays in the default)
+     ===================================================================== */
+  /* --- Starship bridge: warm console colors, a colored rail on every panel --- */
+  html[data-theme="bridge"] {
+    --bg: #04050a; --panel: #0c0e16; --panel2: #171a27; --line: #2a2e42;
+    --fg: #f6ead7; --muted: #d4b48f; --dim: #7c6a58; --body2: #e8dcc8;
+    --amber: #ff9e5e; --violet: #b9a3ff; --blue: #82b4ff; --green: #8be0a4; --red: #ff6f61; --claude: #ff9e5e;
+    --bub-them: #262a3a; --bub-them-fg: #f6ead7; --bub-me: #c97a4a; --lit: #ffb877; --lit-bg: #3a2616;
+    --r: 26px;
+    --font: "Barlow", -apple-system, sans-serif; --font-display: "Oswald", "Barlow", sans-serif; --font-label: "Oswald", sans-serif;
+  }
+  html[data-theme="bridge"] .panel { --accent: var(--amber); border-left: 16px solid var(--accent); border-radius: 30px 14px 14px 30px; }
+  html[data-theme="bridge"] #msgp, html[data-theme="bridge"] #remp { --accent: var(--violet); }
+  html[data-theme="bridge"] #spot, html[data-theme="bridge"] #wxp { --accent: var(--blue); }
+  html[data-theme="bridge"] #notif, html[data-theme="bridge"] #lightp { --accent: #e88a6e; }
+  html[data-theme="bridge"] #cl, html[data-theme="bridge"] #hkp, html[data-theme="bridge"] #actp { --accent: #c9a0dc; }
+  html[data-theme="bridge"] .label { color: var(--accent); font-size: 15px; letter-spacing: .22em; font-weight: 500; }
+  html[data-theme="bridge"] .label .sp { height: 9px; border-radius: 99px; background: var(--accent); opacity: .55; align-self: center; margin: 0 4px; }
+  html[data-theme="bridge"] .clock .t { font-weight: 500; letter-spacing: .02em; font-size: 72px; color: var(--amber); }
+  html[data-theme="bridge"] .pill { background: var(--accent); color: #0c0e16; font-family: var(--font-label); letter-spacing: .08em; }
+  html[data-theme="bridge"] .ntile, html[data-theme="bridge"] .act, html[data-theme="bridge"] .lt, html[data-theme="bridge"] .msg { border-radius: 18px 6px 6px 18px; }
+
+  /* --- Holo HUD: cyan light on black glass, thin outlines and corner brackets --- */
+  html[data-theme="hud"] {
+    --bg: #010609; --panel: rgba(0, 170, 210, .045); --panel2: rgba(0, 200, 255, .085); --line: rgba(0, 215, 255, .28);
+    --fg: #e3fbff; --muted: #78d2e6; --dim: #3c7484; --body2: #c5eef7;
+    --blue: #38e1ff; --green: #3cffb4; --amber: #ffd166; --red: #ff4d6d; --violet: #9db8ff; --claude: #38e1ff;
+    --bub-them: rgba(0, 200, 255, .12); --bub-them-fg: #e3fbff; --bub-me: #0a8fb3; --lit: #7ff0ff; --lit-bg: rgba(0, 220, 255, .14);
+    --track: rgba(0, 220, 255, .12); --r: 4px;
+    --font: "Rajdhani", -apple-system, sans-serif; --font-display: "Rajdhani", sans-serif; --font-label: "Share Tech Mono", ui-monospace, monospace;
+  }
+  html[data-theme="hud"] body { background: radial-gradient(ellipse at 50% 0%, #04202b 0%, #010609 70%); }
+  html[data-theme="hud"] body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 4;
+    background: repeating-linear-gradient(to bottom, rgba(120, 230, 255, .035) 0 1px, transparent 1px 4px); }
+  html[data-theme="hud"] .panel { border: 1px solid var(--line); box-shadow: inset 0 0 40px rgba(0, 200, 255, .06), 0 0 18px rgba(0, 200, 255, .07); }
+  html[data-theme="hud"] .panel::before, html[data-theme="hud"] .panel::after { content: ""; position: absolute; width: 22px; height: 22px; pointer-events: none; }
+  html[data-theme="hud"] .panel::before { top: -1px; left: -1px; border-top: 2px solid var(--blue); border-left: 2px solid var(--blue); }
+  html[data-theme="hud"] .panel::after { bottom: -1px; right: -1px; border-bottom: 2px solid var(--blue); border-right: 2px solid var(--blue); }
+  html[data-theme="hud"] .label { color: var(--blue); letter-spacing: .2em; font-weight: 400; text-shadow: 0 0 8px rgba(56, 225, 255, .5); }
+  html[data-theme="hud"] .clock .t { font-weight: 600; letter-spacing: .04em; color: var(--blue); text-shadow: 0 0 18px rgba(56, 225, 255, .55); }
+  html[data-theme="hud"] .ntile, html[data-theme="hud"] .act, html[data-theme="hud"] .lt, html[data-theme="hud"] .msg, html[data-theme="hud"] .wx-h, html[data-theme="hud"] .task { border: 1px solid rgba(0, 215, 255, .18); }
+  html[data-theme="hud"] .ntile.hot .n, html[data-theme="hud"] .wx-t { text-shadow: 0 0 14px currentColor; }
+
+  /* --- Pit wall: race-control telemetry, red stripes and timing colors --- */
+  html[data-theme="pitwall"] {
+    --bg: #070709; --panel: #111115; --panel2: #1b1b21; --line: #2b2b34;
+    --fg: #f6f6f8; --muted: #a3a3ae; --dim: #5f5f6a; --body2: #dcdce2;
+    --red: #e10600; --green: #00d26a; --violet: #b45cff; --amber: #ffd400; --blue: #2f9bff; --claude: #e10600;
+    --bub-them: #26262e; --bub-me: #b30500; --lit: #ffd400; --lit-bg: #2e2a10;
+    --r: 4px;
+    --font: "Titillium Web", -apple-system, sans-serif; --font-display: "Titillium Web", sans-serif; --font-label: "Titillium Web", sans-serif;
+  }
+  html[data-theme="pitwall"] body { background: repeating-linear-gradient(135deg, #070709 0 22px, #09090c 22px 44px); }
+  html[data-theme="pitwall"] .panel { border-top: 4px solid var(--red); }
+  html[data-theme="pitwall"] .label { font-style: italic; font-weight: 700; letter-spacing: .12em; color: var(--fg); }
+  html[data-theme="pitwall"] .label::before { content: ""; width: 5px; height: 15px; background: var(--red); transform: skewX(-18deg); flex: none; }
+  html[data-theme="pitwall"] .clock .t { font-style: italic; font-weight: 700; font-variant-numeric: tabular-nums; }
+  html[data-theme="pitwall"] .pill { border-radius: 2px; transform: skewX(-12deg); background: var(--red); color: #fff; font-weight: 700; }
+  html[data-theme="pitwall"] .ntile.hot { box-shadow: inset 4px 0 0 var(--violet); } html[data-theme="pitwall"] .ntile.hot .n { color: var(--violet); }
+  html[data-theme="pitwall"] .act, html[data-theme="pitwall"] .lt, html[data-theme="pitwall"] .ntile, html[data-theme="pitwall"] .msg { border-radius: 3px; }
+  html[data-theme="pitwall"] .cb { border-radius: 6px; }
+
+  /* --- Daylight: a light look for bright rooms --- */
+  html[data-theme="daylight"] {
+    --bg: #e7eaef; --panel: #ffffff; --panel2: #f0f2f6; --line: #d9dee6;
+    --fg: #14171c; --muted: #59626e; --dim: #8b939e; --body2: #2c323a;
+    --green: #0a9c4a; --amber: #b87300; --red: #d33339; --blue: #2363d6; --violet: #7048d0; --claude: #c25f3f;
+    --bub-them: #e6e9ee; --bub-them-fg: #14171c; --bub-me: #0a7cff; --lit: #b87300; --lit-bg: #fff3d6; --track: rgba(0, 0, 0, .06);
+  }
+  html[data-theme="daylight"] .panel { box-shadow: 0 1px 2px rgba(20, 30, 50, .06), 0 6px 18px rgba(20, 30, 50, .06); }
 
   /* ---------- one-row tiles (a quarter of the Edge's height) ---------- */
   .panel[data-h="1"] { padding: 12px 16px; }
@@ -580,6 +657,9 @@
     <details class="sec" data-sec="display">
       <summary><span class="car"></span>Display<span class="sub">Full screen, restart</span></summary>
       <div class="secb">
+    <div class="fld"><label for="theme">Theme</label>
+      <select id="theme"><option value="default">Default</option><option value="bridge">Starship bridge</option><option value="hud">Holo HUD</option><option value="pitwall">Pit wall</option><option value="daylight">Daylight</option></select>
+      <div class="hint">Changes the Edge's colors, fonts and panel shapes. This settings page keeps the default look.</div></div>
     <label class="chk"><input type="checkbox" id="fullscreen"> Full screen on the Edge (quit it with Command+Q)</label>
     <div class="hint">Takes effect when the dashboard restarts. <button class="ghost" id="restart" style="padding:6px 12px;font-size:14px;margin-left:6px">Restart dashboard now</button></div>
       </div>
@@ -615,7 +695,23 @@ const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "
 const GW = 8, GH = 4;      // the Edge as a grid: 8 cells across, 4 down
 let layout = { boxes: { calendar: [0, 0, 2, 4], messages: [2, 0, 2, 4], music: [4, 0, 2, 4], ai: [6, 0, 2, 2], reminders: [6, 2, 2, 2] }, music: "spotify", ai: "claude", aiTask: true };
 const panelOn = id => !!(layout.boxes || {})[id];
+const THEME_FONTS = {
+  bridge: "family=Oswald:wght@400;500;600&family=Barlow:wght@400;500;600;700",
+  hud: "family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono",
+  pitwall: "family=Titillium+Web:ital,wght@0,400;0,600;0,700;1,700",
+};
+function applyTheme() {
+  if (SETTINGS_PAGE) return;
+  const t = prefs.theme || "default";
+  if (t === "default") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  if (THEME_FONTS[t] && !document.getElementById("font-" + t)) {   // fonts load once; offline, the fallbacks are used
+    const l = document.createElement("link"); l.id = "font-" + t; l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?" + THEME_FONTS[t] + "&display=swap";
+    document.head.appendChild(l);
+  }
+}
 function applyLayout() {
+  applyTheme();
   Object.keys(PANEL_EL).forEach(id => {
     const el = $(PANEL_EL[id]), b = (layout.boxes || {})[id];
     el.classList.toggle("off", !b);
@@ -1958,6 +2054,7 @@ async function openSetup() {
   $("cid").value = prefs.spotifyClientId || "";
   $("officeName").value = prefs.speaker || "office speakers";
   $("fullscreen").checked = prefs.fullscreen !== false;
+  $("theme").value = prefs.theme || "default";
   $("msgFirst").checked = prefs.msgNames === "first";
   $("calSource").value = prefs.calSource || "links"; $("calSource").onchange();
   loadBadgeRows();
@@ -1998,6 +2095,7 @@ $("save").onclick = async () => {
   const oldCid = prefs.spotifyClientId || "";
   const newPrefs = { spotifyClientId: $("cid").value.trim(), speaker: $("officeName").value.trim() || "office speakers", fullscreen: $("fullscreen").checked, msgNames: $("msgFirst").checked ? "first" : "full",
     calSource: $("calSource").value,
+    theme: $("theme").value,
     weather: Object.assign({}, wxDraft || { name: "", lat: null, lon: null }, { units: $("wxUnits").value }),
     actions: collectActions(),
     lights: collectLights(),

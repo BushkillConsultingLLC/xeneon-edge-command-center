@@ -23,6 +23,16 @@ Corsair's widget layer for the Edge only runs in iCUE on Windows. On a Mac the p
 
 ![The layout editor: Calendar 2 × 4, Notifications 2 × 1 above Messages 2 × 3, Music 4 × 2, Reminders 2 × 2 and Claude 1 × 2](docs/layout-example.png)
 
+**Themes.** Pick a look in settings → Display → Theme. Each one changes colors, fonts and panel shapes; the fonts load from Google Fonts, with plain system fonts used if the Mac is offline.
+
+| Starship bridge | Holo HUD |
+|---|---|
+| ![Starship bridge theme: warm console colors with a colored rail on each panel](docs/theme-bridge.png) | ![Holo HUD theme: cyan outlines and corner brackets on black glass](docs/theme-hud.png) |
+| **Pit wall** | **Daylight** |
+| ![Pit wall theme: race-control telemetry look with red stripes](docs/theme-pitwall.png) | ![Daylight theme: a light look for bright rooms](docs/theme-daylight.png) |
+
+The themes are original designs, not copies of any film, show or racing series.
+
  Tap the ⚙︎ in the bottom-right corner of the Edge and settings open in your normal browser **on your main monitor**, where typing works properly. Save, and the Edge updates within a few seconds. (You can also open `http://127.0.0.1:8888/?settings` directly.)
 
 Everything runs on your Mac. A small Python server listens only on `127.0.0.1`, and nothing is sent anywhere except the services you connect (Spotify, your calendar feeds, Claude's public status page).

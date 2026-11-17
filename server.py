@@ -945,7 +945,8 @@ DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscree
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
                  "calSource": "links", "hiddenCals": [], "tiles": {}, "hiddenRemLists": [],
                  "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
-                 "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}, "hotkeys": DEFAULT_HOTKEYS}
+                 "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}, "hotkeys": DEFAULT_HOTKEYS,
+                 "theme": "default"}
 
 
 def get_prefs():
@@ -984,6 +985,8 @@ def get_prefs():
                                 "units": "c" if w.get("units") == "c" else "f"}
         except (TypeError, ValueError):
             p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
+    if saved.get("theme") in ("default", "bridge", "hud", "pitwall", "daylight"):
+        p["theme"] = saved["theme"]
     if isinstance(saved.get("hotkeys"), list):
         p["hotkeys"] = clean_hotkeys(saved["hotkeys"])
     lt = saved.get("lights")
@@ -1873,7 +1876,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights", "hotkeys"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights", "hotkeys", "theme"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):
