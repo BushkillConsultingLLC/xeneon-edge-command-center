@@ -198,6 +198,10 @@
   .hkapp { display: inline-flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 13px; color: var(--fg); background: var(--panel2); border-radius: 99px; padding: 3px 10px 3px 4px; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .hkapp img { width: 20px; height: 20px; border-radius: 5px; }
   .hkapp.generic { color: var(--muted); padding-left: 10px; }
+  .hkpin { flex: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-auto-rows: 52px; margin-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .hkpin .act { flex-direction: row; gap: 6px; padding: 4px 8px; } .hkpin .act .ai { font-size: 20px; } .hkpin .act .al { font-size: 13px; -webkit-line-clamp: 1; } .hkpin .act .ak { display: none; }
+  .hkpin + .acts { margin-top: 10px; }
+  .panel[data-h="1"] .hkpin { display: none; }
   .act .ak { font-size: 11px; color: var(--muted); font-weight: 500; }
   .panel[data-h="1"] .act .ak { display: none; }
   .panel[data-h="1"] #hkp .label { display: none; }
@@ -452,6 +456,7 @@
   <!-- HOT KEYS -->
   <section class="panel" id="hkp">
     <div class="label">Hot Keys<span class="sp"></span><span class="hkapp" id="hkapp"></span></div>
+    <div class="acts hkpin" id="hkpin" hidden></div>
     <div class="acts" id="hks"><div class="empty">Watching the app in front…</div></div>
   </section>
 
@@ -559,7 +564,7 @@
     <details class="sec" data-sec="hotkeys">
       <summary><span class="car"></span>Hot Keys<span class="sub">Buttons that change with the app you're using</span></summary>
       <div class="secb">
-    <div class="hint" style="margin:0 0 12px">The Hot Keys tile shows the buttons for whichever app is in front on your main screen. A button can press a keyboard shortcut or type a saved bit of text (great for prompts in Claude). To capture a shortcut, click <b>Record</b> and press it, or type it like cmd+shift+t. "Only when the window title contains" lets one app have different buttons per site, like Gmail in Chrome. The <b>*</b> app is used for any app without its own buttons. Gmail's buttons need Gmail's keyboard shortcuts turned on (Gmail → ⚙︎ → See all settings → Keyboard shortcuts on).</div>
+    <div class="hint" style="margin:0 0 12px">The Hot Keys tile shows the buttons for whichever app is in front on your main screen. A button can press a keyboard shortcut or type a saved bit of text (great for prompts in Claude). To capture a shortcut, click <b>Record</b> and press it, or type it like cmd+shift+t. "Only when the window title contains" lets one app have different buttons per site, like Gmail in Chrome. The <b>*</b> app is used for any app without its own buttons, and the <b>Always</b> app's buttons sit in a row across the top of the tile for every app. Gmail's buttons need Gmail's keyboard shortcuts turned on (Gmail → ⚙︎ → See all settings → Keyboard shortcuts on).</div>
     <div id="hkprofs"></div>
     <button class="ghost" id="addHkApp" type="button">+ Add an app</button>
       </div>
@@ -1492,12 +1497,16 @@ async function loadHotkeys() {
   if (!panelOn("hotkeys")) return;
   hkLast = Date.now();
   let d; try { d = await (await fetch("/api/hotkeys")).json(); } catch (e) { return; }
-  const sig = d.app + "|" + d.profile + "|" + JSON.stringify(d.buttons);
+  const sig = d.app + "|" + d.profile + "|" + JSON.stringify(d.buttons) + JSON.stringify(d.pinned || []);
   if (sig === hkSig) return;                // only redraw when the app (or its buttons) change
   hkSig = sig; hkData = d;
   const pill = $("hkapp");
   pill.className = "hkapp" + (d.generic ? " generic" : "");
   pill.innerHTML = d.app ? (d.generic ? "" : `<img src="${esc(iconUrl({ type: "app", target: d.app }))}" alt="" onerror="this.remove()">`) + esc(d.app) : "";
+  const pinBox = $("hkpin"), pins = d.pinned || [];
+  pinBox.hidden = !pins.length;
+  pinBox.innerHTML = pins.map((b, i) => `<button class="act" data-i="${i}" title="${esc(b.label)}"><span class="ai">${esc(b.icon || (b.kind === "text" ? "💬" : b.kind === "menu" ? "☰" : "⌨️"))}</span><span class="al">${esc(b.label)}</span><span class="ak"></span></button>`).join("");
+  pinBox.querySelectorAll(".act").forEach(el => el.onclick = () => macOpen({ kind: "hotkey", pinned: true, i: +el.dataset.i, label: hkData.pinned[+el.dataset.i].label }, el));
   const box = $("hks");
   if (!d.buttons.length) { box.innerHTML = `<div class="empty">No buttons for ${esc(d.app || "this app")}. Add some in ⚙︎ settings → Hot Keys.</div>`; return; }
   box.innerHTML = d.buttons.map((b, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(b.icon || (b.kind === "text" ? "💬" : b.kind === "menu" ? "☰" : "⌨️"))}</span><span class="al">${esc(b.label)}</span><span class="ak">${b.kind === "text" ? "types text" : b.kind === "menu" ? "menu" : esc(prettyKeys(b.value))}</span></button>`).join("");

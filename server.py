@@ -510,9 +510,12 @@ DEFAULT_HOTKEYS = [
         _hk("Tighten", "Make this shorter and clearer. Keep my voice.", "✂️", "text"),
         _hk("Next steps", "What should I do next? Give me a short checklist.", "✅", "text")]},
     {"app": "*", "title": "", "buttons": [
-        _hk("Copy", "cmd+c", "📋"), _hk("Paste", "cmd+v", "📥"), _hk("Undo", "cmd+z", "↶"), _hk("Find", "cmd+f", "🔍"),
-        _hk("Save", "cmd+s", "💾"), _hk("Screenshot", "cmd+shift+4", "📸")]},
+        _hk("Find", "cmd+f", "🔍"), _hk("Save", "cmd+s", "💾"), _hk("Select all", "cmd+a", "🔲"), _hk("New", "cmd+n", "➕")]},
+    # "Always": a row pinned across the top of the tile, whatever app is in front
+    {"app": "Always", "title": "", "buttons": [
+        _hk("Copy", "cmd+c", "📋"), _hk("Paste", "cmd+v", "📥"), _hk("Undo", "cmd+z", "↶"), _hk("Screenshot", "cmd+shift+4", "📸")]},
 ]
+PINNED = "always"
 KEY_CODES = {"return": 36, "enter": 76, "tab": 48, "space": 49, "delete": 51, "escape": 53, "esc": 53,
              "left": 123, "right": 124, "down": 125, "up": 126, "home": 115, "end": 119, "pageup": 116, "pagedown": 121,
              "forwarddelete": 117, "f1": 122, "f2": 120, "f3": 99, "f4": 118, "f5": 96, "f6": 97, "f7": 98, "f8": 100,
@@ -592,8 +595,12 @@ def front_app():
     return dict(_front)
 
 
+def hotkey_pinned():
+    return next((p for p in get_prefs()["hotkeys"] if p["app"].lower() == PINNED), None)
+
+
 def hotkey_profile(app, title):
-    profs = get_prefs()["hotkeys"]
+    profs = [p for p in get_prefs()["hotkeys"] if p["app"].lower() != PINNED]
     a, t = (app or "").lower(), (title or "").lower()
     for p in profs:                                   # most specific first: app + window title
         if p["app"].lower() == a and p["title"] and p["title"].lower() in t:
@@ -678,14 +685,16 @@ def app_menus(app):
 def hotkey_view():
     f = front_app()
     p = hotkey_profile(f["app"], f["title"])
+    pin = hotkey_pinned()
     return {"ok": True, "app": f["app"], "title": f["title"], "profile": (p["app"] + ("|" + p["title"] if p["title"] else "")) if p else "",
-            "generic": bool(p and p["app"] == "*"), "buttons": p["buttons"] if p else []}
+            "generic": bool(p and p["app"] == "*"), "buttons": p["buttons"] if p else [],
+            "pinned": pin["buttons"] if pin else []}
 
 
-def run_hotkey(i, expect):
+def run_hotkey(i, expect, pinned=False):
     """Bring the remembered app forward, then press its keys or type its text."""
     f = dict(_front)
-    p = hotkey_profile(f["app"], f["title"])
+    p = hotkey_pinned() if pinned else hotkey_profile(f["app"], f["title"])
     if not p or not f["pid"] or not (0 <= i < len(p["buttons"])):
         return False
     b = p["buttons"][i]
@@ -1769,7 +1778,7 @@ class Handler(SimpleHTTPRequestHandler):
                     else:
                         ok = mac_open(["-a", target or name])
                 elif kind == "hotkey":
-                    ok = run_hotkey(int(body.get("i", -1)), str(body.get("label", "")))
+                    ok = run_hotkey(int(body.get("i", -1)), str(body.get("label", "")), bool(body.get("pinned")))
                 elif kind == "weather-app":
                     ok = mac_open(["-a", "Weather"])
                 elif kind == "action":
