@@ -182,6 +182,24 @@
   .lrow input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--green); }
   .lrow input:not([type]) { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 8px 12px; font-size: 15px; width: 100%; }
 
+  /* ---------- hot keys ---------- */
+  .hkapp { display: inline-flex; align-items: center; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 13px; color: var(--fg); background: var(--panel2); border-radius: 99px; padding: 3px 10px 3px 4px; max-width: 60%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .hkapp img { width: 20px; height: 20px; border-radius: 5px; }
+  .hkapp.generic { color: var(--muted); padding-left: 10px; }
+  .act .ak { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .panel[data-h="1"] .act .ak { display: none; }
+  .panel[data-h="1"] #hkp .label { display: none; }
+  .hkprof { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .hkhead { display: grid; grid-template-columns: 1fr 1fr 40px; gap: 8px; margin-bottom: 10px; }
+  .hkhead input, .hkrow input, .hkrow select { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); padding: 9px 10px; font-size: 15px; width: 100%; }
+  .hkrow { display: grid; grid-template-columns: 64px 1fr 120px 1.5fr 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .hkrow .icb { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; font-size: 20px; padding: 0; display: flex; align-items: center; justify-content: center; min-height: 42px; }
+  .hkval { display: flex; gap: 6px; align-items: center; }
+  .hkval .rec { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
+  .hkval .rec.on { background: var(--red); color: #fff; }
+  .hkval label { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .hkval label input { width: 18px; height: 18px; padding: 0; }
+
   /* ---------- one-row tiles (a quarter of the Edge's height) ---------- */
   .panel[data-h="1"] { padding: 12px 16px; }
   .panel[data-h="1"] .label { font-size: 11px; }
@@ -413,6 +431,12 @@
     <div class="lts" id="lts"><div class="empty">Loading…</div></div>
   </section>
 
+  <!-- HOT KEYS -->
+  <section class="panel" id="hkp">
+    <div class="label">Hot Keys<span class="sp"></span><span class="hkapp" id="hkapp"></span></div>
+    <div class="acts" id="hks"><div class="empty">Watching the app in front…</div></div>
+  </section>
+
   <!-- CLAUDE -->
   <section class="panel" id="cl">
     <div class="label" id="ailabel"><span style="color:var(--claude)">✳︎</span> Claude</div>
@@ -514,6 +538,14 @@
     <div class="hint">App: an app's name, like Zoom. Link: an https:// address. Shortcut: the exact name of a shortcut from the Shortcuts app (great for Focus modes, smart home scenes and anything else). Folder: a folder path such as ~/Documents/Clients. Light: switch one of your Govee rooms on and off, or turn every light off.</div>
       </div>
     </details>
+    <details class="sec" data-sec="hotkeys">
+      <summary><span class="car"></span>Hot Keys<span class="sub">Buttons that change with the app you're using</span></summary>
+      <div class="secb">
+    <div class="hint" style="margin:0 0 12px">The Hot Keys tile shows the buttons for whichever app is in front on your main screen. A button can press a keyboard shortcut or type a saved bit of text (great for prompts in Claude). To capture a shortcut, click <b>Record</b> and press it, or type it like cmd+shift+t. "Only when the window title contains" lets one app have different buttons per site, like Gmail in Chrome. The <b>*</b> app is used for any app without its own buttons. Gmail's buttons need Gmail's keyboard shortcuts turned on (Gmail → ⚙︎ → See all settings → Keyboard shortcuts on).</div>
+    <div id="hkprofs"></div>
+    <button class="ghost" id="addHkApp" type="button">+ Add an app</button>
+      </div>
+    </details>
     <details class="sec" data-sec="ai">
       <summary><span class="car"></span>AI assistant<span class="sub">Status and task card</span></summary>
       <div class="secb">
@@ -554,9 +586,9 @@ const PALETTE = ["#6aa8ff", "#1ed760", "#c3a6ff", "#f5b942", "#ff8a65", "#4dd0e1
 /* =========================================================
    LAYOUT (which panels show, how wide, in what order)
    ========================================================= */
-const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp", weather: "wxp", actions: "actp", lights: "lightp" };
-const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders", weather: "Weather", actions: "Quick Actions", lights: "Lights" };
-const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942", weather: "#4dd0e1", actions: "#b0bec5", lights: "#ffd166" };
+const PANEL_EL = { calendar: "cal", messages: "msgp", notifications: "notif", music: "spot", ai: "cl", reminders: "remp", weather: "wxp", actions: "actp", lights: "lightp", hotkeys: "hkp" };
+const PANEL_NAME = { calendar: "Calendar", messages: "Messages", notifications: "Notifications", music: "Music", ai: "AI assistant", reminders: "Reminders", weather: "Weather", actions: "Quick Actions", lights: "Lights", hotkeys: "Hot Keys" };
+const PANEL_COLOR = { calendar: "#6aa8ff", messages: "#c3a6ff", notifications: "#f2555a", music: "#1ed760", ai: "#d97757", reminders: "#f5b942", weather: "#4dd0e1", actions: "#b0bec5", lights: "#ffd166", hotkeys: "#9575cd" };
 const GW = 8, GH = 4;      // the Edge as a grid: 8 cells across, 4 down
 let layout = { boxes: { calendar: [0, 0, 2, 4], messages: [2, 0, 2, 4], music: [4, 0, 2, 4], ai: [6, 0, 2, 2], reminders: [6, 2, 2, 2] }, music: "spotify", ai: "claude", aiTask: true };
 const panelOn = id => !!(layout.boxes || {})[id];
@@ -571,7 +603,7 @@ function applyLayout() {
     }
   });
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
-  loadBadges(); loadReminders(false); loadWeather(); renderActions(); loadLights();
+  loadBadges(); loadReminders(false); loadWeather(); renderActions(); loadLights(); hkSig = ""; loadHotkeys();
   applyAi();
   applyMusicMode();
 }
@@ -1385,6 +1417,110 @@ function collectLights() {
   return out;
 }
 
+/* =========================================================
+   HOT KEYS (buttons for the app in front on the main screen)
+   ========================================================= */
+const KEY_SYM = { cmd: "⌘", shift: "⇧", option: "⌥", ctrl: "⌃", return: "↩", tab: "⇥", space: "Space", delete: "⌫", escape: "esc", left: "←", right: "→", up: "↑", down: "↓" };
+const prettyKeys = v => String(v).split("+").map(k => KEY_SYM[k.toLowerCase()] || (k.length === 1 ? k.toUpperCase() : k)).join("");
+let hkSig = "", hkData = null, hkLast = 0;
+async function loadHotkeys() {
+  if (!panelOn("hotkeys")) return;
+  hkLast = Date.now();
+  let d; try { d = await (await fetch("/api/hotkeys")).json(); } catch (e) { return; }
+  const sig = d.app + "|" + d.profile + "|" + JSON.stringify(d.buttons);
+  if (sig === hkSig) return;                // only redraw when the app (or its buttons) change
+  hkSig = sig; hkData = d;
+  const pill = $("hkapp");
+  pill.className = "hkapp" + (d.generic ? " generic" : "");
+  pill.innerHTML = d.app ? (d.generic ? "" : `<img src="${esc(iconUrl({ type: "app", target: d.app }))}" alt="" onerror="this.remove()">`) + esc(d.app) : "";
+  const box = $("hks");
+  if (!d.buttons.length) { box.innerHTML = `<div class="empty">No buttons for ${esc(d.app || "this app")}. Add some in ⚙︎ settings → Hot Keys.</div>`; return; }
+  box.innerHTML = d.buttons.map((b, i) => `<button class="act" data-i="${i}"><span class="ai">${esc(b.icon || (b.kind === "text" ? "💬" : "⌨️"))}</span><span class="al">${esc(b.label)}</span><span class="ak">${b.kind === "text" ? "types text" : esc(prettyKeys(b.value))}</span></button>`).join("");
+  box.querySelectorAll(".act").forEach(el => el.onclick = () => {
+    const b = hkData.buttons[+el.dataset.i];
+    macOpen({ kind: "hotkey", i: +el.dataset.i, label: b.label }, el);
+  });
+}
+setInterval(() => { if (Date.now() - hkLast > 1200) loadHotkeys(); }, 700);
+
+/* settings: hot keys editor */
+const CODE_KEY = { Enter: "return", Tab: "tab", Space: "space", Backspace: "delete", Escape: "escape", ArrowLeft: "left", ArrowRight: "right",
+  ArrowUp: "up", ArrowDown: "down", BracketLeft: "[", BracketRight: "]", Slash: "/", Backslash: "\\", Comma: ",", Period: ".", Semicolon: ";",
+  Quote: "'", Minus: "-", Equal: "=", Backquote: "`", Delete: "forwarddelete", Home: "home", End: "end", PageUp: "pageup", PageDown: "pagedown" };
+function comboFromEvent(e) {
+  let key = null;
+  if (/^Key[A-Z]$/.test(e.code)) key = e.code.slice(3).toLowerCase();
+  else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5);
+  else if (/^F\d{1,2}$/.test(e.code)) key = e.code.toLowerCase();
+  else key = CODE_KEY[e.code] || null;
+  if (!key) return null;
+  return [e.metaKey && "cmd", e.ctrlKey && "ctrl", e.altKey && "option", e.shiftKey && "shift", key].filter(Boolean).join("+");
+}
+function hkBtnRow(b) {
+  const d = document.createElement("div"); d.className = "hkrow";
+  d.innerHTML = `<button type="button" class="icb" aria-label="Icon: click to choose"></button>
+    <input class="lb" maxlength="24" placeholder="Button name" aria-label="Button name">
+    <select class="kd" aria-label="What it does"><option value="keys">Keys</option><option value="text">Type text</option></select>
+    <span class="hkval"></span>
+    <button class="x" type="button" title="Remove" aria-label="Remove">✕</button>`;
+  d.querySelector(".lb").value = b.label || "";
+  const kd = d.querySelector(".kd"), hv = d.querySelector(".hkval");
+  const draw = val => {
+    if (kd.value === "text") {
+      hv.innerHTML = `<input class="vv" maxlength="1000" placeholder="Text to type, e.g. Summarize this" aria-label="Text to type"><label><input type="checkbox" class="en"> Return</label>`;
+      hv.querySelector(".vv").value = val || ""; hv.querySelector(".en").checked = !!b.enter;
+    } else {
+      hv.innerHTML = `<input class="vv" maxlength="40" spellcheck="false" placeholder="e.g. cmd+shift+t" aria-label="Shortcut"><button type="button" class="ghost rec">Record</button>`;
+      const vv = hv.querySelector(".vv"), rec = hv.querySelector(".rec");
+      vv.value = val || "";
+      rec.onclick = () => {
+        rec.classList.add("on"); rec.textContent = "Press keys…"; vv.focus();
+        const stop = () => { rec.classList.remove("on"); rec.textContent = "Record"; vv.removeEventListener("keydown", grab, true); };
+        const grab = e => {
+          if (["Meta", "Shift", "Alt", "Control"].includes(e.key)) return;   // wait for the real key
+          e.preventDefault(); e.stopPropagation();
+          const c = comboFromEvent(e); if (c) vv.value = c; stop();
+        };
+        vv.addEventListener("keydown", grab, true);
+        vv.addEventListener("blur", stop, { once: true });
+      };
+    }
+  };
+  kd.value = b.kind === "text" ? "text" : "keys"; draw(b.value);
+  kd.onchange = () => draw("");
+  const ib = d.querySelector(".icb"); ib.onclick = () => openIconPicker(ib);
+  ib.dataset.icon = b.icon || ""; ib.innerHTML = b.icon ? esc(b.icon) : `<span style="opacity:.4">⌨️</span>`;
+  d.querySelector(".x").onclick = () => d.remove();
+  return d;
+}
+function hkProfCard(p) {
+  const c = document.createElement("div"); c.className = "hkprof";
+  c.innerHTML = `<div class="hkhead"><input class="ha" maxlength="40" placeholder="App name, e.g. Google Chrome (or * for any app)" aria-label="App name">
+    <input class="ht" maxlength="40" placeholder="Only when the window title contains… (optional)" aria-label="Window title contains">
+    <button class="x" type="button" title="Remove this app" aria-label="Remove this app">✕</button></div><div class="hkbtns"></div>
+    <button class="ghost addb" type="button" style="padding:7px 12px;font-size:14px">+ Add a button</button>`;
+  c.querySelector(".ha").value = p.app || ""; c.querySelector(".ht").value = p.title || "";
+  const list = c.querySelector(".hkbtns");
+  (p.buttons || []).forEach(b => list.appendChild(hkBtnRow(b)));
+  c.querySelector(".addb").onclick = () => list.appendChild(hkBtnRow({ kind: "keys" }));
+  c.querySelector(".hkhead .x").onclick = () => c.remove();
+  return c;
+}
+function loadHotkeyRows() {
+  const box = $("hkprofs"); box.innerHTML = "";
+  (prefs.hotkeys || []).forEach(p => box.appendChild(hkProfCard(p)));
+}
+$("addHkApp").onclick = () => { const c = hkProfCard({ app: "", buttons: [{ kind: "keys" }] }); $("hkprofs").prepend(c); c.querySelector(".ha").focus(); };
+function collectHotkeys() {
+  if (!$("hkprofs").children.length && (prefs.hotkeys || []).length) return [];
+  return [...$("hkprofs").children].map(c => ({
+    app: c.querySelector(".ha").value.trim(), title: c.querySelector(".ht").value.trim(),
+    buttons: [...c.querySelectorAll(".hkrow")].map(r => ({
+      icon: r.querySelector(".icb").dataset.icon || "", label: r.querySelector(".lb").value.trim(), kind: r.querySelector(".kd").value,
+      value: r.querySelector(".vv").value, enter: !!(r.querySelector(".en") && r.querySelector(".en").checked) })).filter(b => b.value.trim())
+  })).filter(p => p.app);
+}
+
 /* settings: weather location and the action list */
 let wxDraft = null;
 function showWxCur() {
@@ -1425,7 +1561,7 @@ let icTarget = null;
 function openIconPicker(input) {
   closeIconPicker();
   icTarget = input;
-  const row = input.closest(".arow"), cur = rowAction(row);
+  const row = input.closest(".arow, .hkrow"), cur = rowAction(row);
   const canReal = REAL_ICON_TYPES.includes(cur.type) && cur.target;
   const what = cur.type === "url" ? "the website's own icon" : cur.type === "folder" ? "the folder's icon" : "the app's own icon";
   const pk = document.createElement("div"); pk.className = "icpick"; pk.id = "icpick";
@@ -1448,9 +1584,9 @@ function openIconPicker(input) {
 function closeIconPicker() { const pk = $("icpick"); if (pk) pk.remove(); icTarget = null; }
 document.addEventListener("mousedown", e => { if (icTarget && !e.target.closest("#icpick") && !icTarget.contains(e.target)) closeIconPicker(); });
 function rowAction(row) {
-  const tg = row.querySelector(".tg");
-  return { icon: row.querySelector(".icb").dataset.icon || "", label: row.querySelector(".lb").value.trim(),
-           type: row.querySelector(".tp").value, target: tg ? tg.value.trim() : "" };
+  const tg = row.querySelector(".tg"), tp = row.querySelector(".tp");
+  return { icon: row.querySelector(".icb").dataset.icon || "", label: (row.querySelector(".lb") || {}).value ? row.querySelector(".lb").value.trim() : "",
+           type: tp ? tp.value : "", target: tg ? tg.value.trim() : "" };
 }
 function setRowIcon(row, v) {
   const b = row.querySelector(".icb");
@@ -1705,7 +1841,7 @@ async function openSetup() {
   loadNameRows();
   wxDraft = prefs.weather && prefs.weather.lat != null ? Object.assign({}, prefs.weather) : null;
   $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
-  lightRooms = null; loadActionRows();
+  lightRooms = null; loadActionRows(); loadHotkeyRows();
   loadRemRows();
   loadLightRows();
   $("savedmsg").textContent = "";
@@ -1742,6 +1878,7 @@ $("save").onclick = async () => {
     weather: Object.assign({}, wxDraft || { name: "", lat: null, lon: null }, { units: $("wxUnits").value }),
     actions: collectActions(),
     lights: collectLights(),
+    hotkeys: collectHotkeys(),
     hiddenRemLists: document.querySelector("#remrows input[data-remlist]")
       ? [...document.querySelectorAll("#remrows input[data-remlist]")].filter(i => !i.checked).map(i => i.dataset.remlist)
       : (prefs.hiddenRemLists || []),

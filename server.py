@@ -353,7 +353,7 @@ def open_meeting(url):
 
 
 # ---------------- layout (which panels, which services) ----------------
-PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders", "weather", "actions", "lights")
+PANEL_IDS = ("calendar", "messages", "notifications", "music", "ai", "reminders", "weather", "actions", "lights", "hotkeys")
 # Older versions split the Edge into 8 zones: 1-4 across the top, 5-8 across the bottom.
 GRID_W, GRID_H = 8, 4
 # Each panel gets a box on an 8 x 4 grid: [x, y, width, height] in cells.
@@ -436,6 +436,173 @@ def zones_from_panels(panels):
 
 DEFAULT_BADGE_APPS = ["Messages", "Microsoft Outlook", "Mail", "Slack", "Microsoft Teams", "Gmail", "LinkedIn"]
 # Quick Actions: buttons on the Edge. type is app | url | shortcut | folder | system
+# Hot Keys: buttons that change with the app in front on the main screen.
+# keys look like "cmd+shift+t"; kind "text" types a saved snippet (handy for prompts in Claude).
+def _hk(label, value, icon="", kind="keys", enter=False):
+    return {"label": label, "icon": icon, "kind": kind, "value": value, "enter": enter}
+
+
+DEFAULT_HOTKEYS = [
+    {"app": "Google Chrome", "title": "Gmail", "buttons": [
+        _hk("Compose", "c", "✏️"), _hk("Reply", "r", "↩️"), _hk("Reply all", "a", "⏪"), _hk("Forward", "f", "➡️"),
+        _hk("Archive", "e", "🗄️"), _hk("Search", "/", "🔍")]},
+    {"app": "Google Chrome", "title": "", "buttons": [
+        _hk("New tab", "cmd+t", "➕"), _hk("Reopen tab", "cmd+shift+t", "♻️"), _hk("Reload", "cmd+r", "🔄"),
+        _hk("Back", "cmd+[", "⬅️"), _hk("Forward", "cmd+]", "➡️"), _hk("Next tab", "ctrl+tab", "⏭️"),
+        _hk("Address bar", "cmd+l", "🔗"), _hk("Close tab", "cmd+w", "✖️")]},
+    {"app": "Safari", "title": "", "buttons": [
+        _hk("New tab", "cmd+t", "➕"), _hk("Reopen tab", "cmd+shift+t", "♻️"), _hk("Reload", "cmd+r", "🔄"),
+        _hk("Back", "cmd+[", "⬅️"), _hk("Forward", "cmd+]", "➡️"), _hk("Close tab", "cmd+w", "✖️")]},
+    {"app": "Microsoft Outlook", "title": "", "buttons": [
+        _hk("New email", "cmd+n", "✏️"), _hk("Reply", "cmd+r", "↩️"), _hk("Reply all", "cmd+shift+r", "⏪"),
+        _hk("Forward", "cmd+j", "➡️"), _hk("Send", "cmd+return", "📤")]},
+    {"app": "Slack", "title": "", "buttons": [
+        _hk("Jump to", "cmd+k", "🔍"), _hk("All unreads", "cmd+shift+a", "📬")]},
+    {"app": "zoom.us", "title": "", "buttons": [
+        _hk("Mute", "cmd+shift+a", "🎙️"), _hk("Camera", "cmd+shift+v", "🎥"), _hk("Share screen", "cmd+shift+s", "🖥️")]},
+    {"app": "Microsoft Teams", "title": "", "buttons": [
+        _hk("Mute", "cmd+shift+m", "🎙️"), _hk("Camera", "cmd+shift+o", "🎥")]},
+    {"app": "Finder", "title": "", "buttons": [
+        _hk("New folder", "cmd+shift+n", "📁"), _hk("Go to folder", "cmd+shift+g", "🧭"), _hk("Get info", "cmd+i", "ℹ️"),
+        _hk("Downloads", "cmd+option+l", "⬇️"), _hk("Quick Look", "space", "👁️")]},
+    {"app": "Claude", "title": "", "buttons": [
+        _hk("Summarize", "Summarize this in 5 short bullet points.", "📝", "text"),
+        _hk("Explain simply", "Explain this like I'm new to it.", "💡", "text"),
+        _hk("Tighten", "Make this shorter and clearer. Keep my voice.", "✂️", "text"),
+        _hk("Next steps", "What should I do next? Give me a short checklist.", "✅", "text")]},
+    {"app": "*", "title": "", "buttons": [
+        _hk("Copy", "cmd+c", "📋"), _hk("Paste", "cmd+v", "📥"), _hk("Undo", "cmd+z", "↶"), _hk("Find", "cmd+f", "🔍"),
+        _hk("Save", "cmd+s", "💾"), _hk("Screenshot", "cmd+shift+4", "📸")]},
+]
+KEY_CODES = {"return": 36, "enter": 76, "tab": 48, "space": 49, "delete": 51, "escape": 53, "esc": 53,
+             "left": 123, "right": 124, "down": 125, "up": 126, "home": 115, "end": 119, "pageup": 116, "pagedown": 121,
+             "forwarddelete": 117, "f1": 122, "f2": 120, "f3": 99, "f4": 118, "f5": 96, "f6": 97, "f7": 98, "f8": 100,
+             "f9": 101, "f10": 109, "f11": 103, "f12": 111}
+MODS = {"cmd": "command down", "command": "command down", "shift": "shift down", "option": "option down",
+        "opt": "option down", "alt": "option down", "ctrl": "control down", "control": "control down"}
+
+
+def parse_keys(spec):
+    """'cmd+shift+t' -> (['command down', 'shift down'], 't', None) or (mods, None, keycode)."""
+    parts = [x.strip().lower() for x in str(spec).split("+")]
+    if not parts or not parts[-1]:
+        parts = parts[:-1] + ["+"] if str(spec).endswith("+") else parts
+    key, mods = parts[-1], parts[:-1]
+    if any(m not in MODS for m in mods) or not key:
+        return None
+    m = sorted({MODS[x] for x in mods})
+    if key in KEY_CODES:
+        return m, None, KEY_CODES[key]
+    if len(key) == 1 and key.isprintable():
+        return m, key, None
+    return None
+
+
+def clean_hotkeys(v):
+    out = []
+    for prof in (v if isinstance(v, list) else [])[:40]:
+        if not isinstance(prof, dict) or not str(prof.get("app", "")).strip():
+            continue
+        btns = []
+        for b in (prof.get("buttons") or [])[:16]:
+            if not isinstance(b, dict):
+                continue
+            kind = "text" if b.get("kind") == "text" else "keys"
+            val = str(b.get("value", ""))[:1000 if kind == "text" else 40]
+            if not val.strip() or (kind == "keys" and not parse_keys(val)):
+                continue
+            btns.append({"label": str(b.get("label", "")).strip()[:24] or val[:24], "icon": str(b.get("icon", "")).strip()[:8],
+                         "kind": kind, "value": val, "enter": bool(b.get("enter"))})
+        out.append({"app": str(prof["app"]).strip()[:40], "title": str(prof.get("title", "")).strip()[:40], "buttons": btns})
+    return out
+
+
+DASH_PROFILE = os.path.join(HOME, "Library", "Application Support", "CommandCenterChrome")
+_front = {"pid": None, "app": "", "title": "", "t": 0}
+
+
+def _dashboard_pids():
+    try:
+        r = subprocess.run(["/usr/bin/pgrep", "-f", "user-data-dir=" + DASH_PROFILE], capture_output=True, text=True, timeout=2)
+        return {int(x) for x in r.stdout.split() if x.isdigit()}
+    except Exception:
+        return set()
+
+
+FRONT_SCRIPT = r'''
+tell application "System Events"
+  set p to first application process whose frontmost is true
+  set t to ""
+  try
+    set t to name of front window of p
+  end try
+  return (unix id of p as text) & tab & (name of p) & tab & t
+end tell'''
+
+
+def front_app():
+    """The app in front on the main screen. Tapping the Edge brings the dashboard forward,
+    so the dashboard itself is ignored and the last real app is kept."""
+    ok, out, _ = osa(FRONT_SCRIPT, timeout=3)
+    if ok and out.count("\t") >= 2:
+        pid, name, title = out.split("\t", 2)
+        if pid.isdigit() and int(pid) not in _dashboard_pids():
+            _front.update(pid=int(pid), app=name.strip(), title=title.strip()[:200], t=time.time())
+    return dict(_front)
+
+
+def hotkey_profile(app, title):
+    profs = get_prefs()["hotkeys"]
+    a, t = (app or "").lower(), (title or "").lower()
+    for p in profs:                                   # most specific first: app + window title
+        if p["app"].lower() == a and p["title"] and p["title"].lower() in t:
+            return p
+    for p in profs:
+        if p["app"].lower() == a and not p["title"]:
+            return p
+    for p in profs:
+        if p["app"] == "*":
+            return p
+    return None
+
+
+def hotkey_view():
+    f = front_app()
+    p = hotkey_profile(f["app"], f["title"])
+    return {"ok": True, "app": f["app"], "title": f["title"], "profile": (p["app"] + ("|" + p["title"] if p["title"] else "")) if p else "",
+            "generic": bool(p and p["app"] == "*"), "buttons": p["buttons"] if p else []}
+
+
+def run_hotkey(i, expect):
+    """Bring the remembered app forward, then press its keys or type its text."""
+    f = dict(_front)
+    p = hotkey_profile(f["app"], f["title"])
+    if not p or not f["pid"] or not (0 <= i < len(p["buttons"])):
+        return False
+    b = p["buttons"][i]
+    if expect and expect != b["label"]:
+        return False                                  # the app changed under the finger: don't press the wrong thing
+    focus = 'tell application "System Events" to set frontmost of (first process whose unix id is %d) to true\ndelay 0.15\n' % f["pid"]
+    if b["kind"] == "keys":
+        k = parse_keys(b["value"])
+        if not k:
+            return False
+        mods, ch, code = k
+        using = (" using {" + ", ".join(mods) + "}") if mods else ""
+        press = ("key code %d" % code) if code is not None else ('keystroke "%s"' % ch.replace("\\", "\\\\").replace('"', '\\"'))
+        script = focus + 'tell application "System Events" to ' + press + using
+    else:
+        # paste the snippet (faster and safer than typing), then put the clipboard back
+        script = (focus + 'set old to ""\ntry\nset old to the clipboard\nend try\nset the clipboard to %s\ndelay 0.05\n'
+                  'tell application "System Events" to keystroke "v" using {command down}\ndelay 0.25\n'
+                  % json.dumps(b["value"], ensure_ascii=False))
+        if b["enter"]:
+            script += 'tell application "System Events" to key code 36\n'
+        script += 'try\nset the clipboard to old\nend try'
+    ok, _, err = osa(script, timeout=6)
+    return ok
+
+
 DEFAULT_ACTIONS = [
     {"icon": "📁", "label": "Downloads", "type": "folder", "target": "~/Downloads"},
     {"icon": "📅", "label": "Calendar", "type": "app", "target": "Calendar"},
@@ -652,7 +819,7 @@ DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscree
                  "msgNames": "full", "badges": True, "badgeApps": DEFAULT_BADGE_APPS,
                  "calSource": "links", "hiddenCals": [], "tiles": {}, "hiddenRemLists": [],
                  "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
-                 "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}}
+                 "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}, "hotkeys": DEFAULT_HOTKEYS}
 
 
 def get_prefs():
@@ -691,6 +858,8 @@ def get_prefs():
                                 "units": "c" if w.get("units") == "c" else "f"}
         except (TypeError, ValueError):
             p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
+    if isinstance(saved.get("hotkeys"), list):
+        p["hotkeys"] = clean_hotkeys(saved["hotkeys"])
     lt = saved.get("lights")
     if isinstance(lt, dict):
         rooms = lt.get("rooms") if isinstance(lt.get("rooms"), dict) else {}
@@ -1403,6 +1572,8 @@ class Handler(SimpleHTTPRequestHandler):
         if p == "/api/reminders":
             q = parse_qs(u.query)
             return self._json(reminders_shown(force=q.get("force") == ["1"], show_all=q.get("all") == ["1"]))
+        if p == "/api/hotkeys":
+            return self._json(hotkey_view())
         if p == "/api/lights":
             return self._json(lights_view(show_all=parse_qs(u.query).get("all") == ["1"]))
         if p == "/api/weather":
@@ -1478,6 +1649,8 @@ class Handler(SimpleHTTPRequestHandler):
                         ok = mac_open((["-a", "Google Chrome"] if chrome else []) + [target])
                     else:
                         ok = mac_open(["-a", target or name])
+                elif kind == "hotkey":
+                    ok = run_hotkey(int(body.get("i", -1)), str(body.get("label", "")))
                 elif kind == "weather-app":
                     ok = mac_open(["-a", "Weather"])
                 elif kind == "action":
@@ -1568,7 +1741,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights", "hotkeys"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):
