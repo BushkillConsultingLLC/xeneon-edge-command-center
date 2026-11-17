@@ -11,20 +11,23 @@ if [ -f "$DIR/cal-helper.swift" ] && { [ ! -x "$DIR/cal-helper" ] || [ "$DIR/cal
        -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$DIR/cal-helper-Info.plist" \
        > "$HOME/Library/Logs/CommandCenter-build.log" 2>&1; then
     echo "Done."
-    pkill -f "$DIR/server.py" 2>/dev/null && sleep 0.5   # restart the server so it sees the helper
   else
     echo "Couldn't build it (details: ~/Library/Logs/CommandCenter-build.log). Calendar links still work."
   fi
 fi
 
-if ! curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health; then
-  nohup /usr/bin/python3 "$DIR/server.py" > "$HOME/Library/Logs/CommandCenter.log" 2>&1 &
-  disown
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    sleep 0.5
-    curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health && break
-  done
-fi
+# Always start a fresh server, so an update takes effect every time this runs
+pkill -f "$DIR/server.py" 2>/dev/null
+for i in 1 2 3 4 5 6; do
+  curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health || break
+  sleep 0.5
+done
+nohup /usr/bin/python3 "$DIR/server.py" > "$HOME/Library/Logs/CommandCenter.log" 2>&1 &
+disown
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  sleep 0.5
+  curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health && break
+done
 
 if ! curl -s -o /dev/null --max-time 1 http://127.0.0.1:8888/health; then
   echo ""
