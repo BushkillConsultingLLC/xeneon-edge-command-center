@@ -1,0 +1,15 @@
+{
+  "updated": "2026-11-20T18:07:00Z",
+  "alerts": [
+    {
+      "id": "upw:0123456789",
+      "source": "Upwork",
+      "title": "Shopify store audit for a supplement brand",
+      "detail": "Posted 22 min ago · $1,500 fixed · Payment verified",
+      "url": "https://www.upwork.com/jobs/~0123456789",
+      "level": "high",
+      "time": "2026-11-20T17:45:00Z",
+      "expires": "2026-11-21T01:45:00Z"
+    }
+  ]
+}

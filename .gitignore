@@ -9,3 +9,6 @@ badge-debug.txt
 messages-debug.txt
 icon-debug.txt
 govee-debug.txt
+alerts.json
+alerts.json.tmp
+alerts-dismissed.json

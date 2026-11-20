@@ -21,7 +21,7 @@
     font-family: var(--font);
     -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-user-select: none; }
   button { font: inherit; color: inherit; cursor: pointer; }
-  .grid { height: 100vh; padding: 14px; display: grid; gap: 14px;
+  .grid { height: calc(100vh - var(--abh, 0px)); padding: 14px; display: grid; gap: 14px;
     grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); }
   .panel.off { display: none; }
   .panel { container-type: size; container-name: panel; background: var(--panel); border-radius: var(--r); padding: 22px 24px; min-width: 0; min-height: 0;
@@ -459,6 +459,21 @@
   .step.done { color: var(--dim); } .step.done b { color: var(--green); }
   .step.active { color: var(--fg); } .step.active b { color: var(--claude); }
   .upd { font-size: 12px; color: var(--dim); margin-top: auto; padding-top: 8px; }
+  /* ---------- alert bar ---------- */
+  #alertbar { height: 58px; margin: 10px 14px 0; display: flex; align-items: stretch; gap: 8px; }
+  #alertbar[hidden] { display: none; }
+  body.has-alert { --abh: 68px; }
+  .ab-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; background: var(--panel); border: 0; border-radius: var(--r); padding: 0 18px; color: var(--fg); text-align: left;
+    box-shadow: inset 4px 0 0 var(--blue); }
+  #alertbar.high .ab-main { box-shadow: inset 4px 0 0 var(--red), 0 0 0 1px rgba(242, 85, 90, .35); animation: abpulse 1.6s ease-in-out 4; }
+  @keyframes abpulse { 50% { box-shadow: inset 4px 0 0 var(--red), 0 0 0 3px rgba(242, 85, 90, .55); } }
+  .ab-ic { font-size: 24px; flex: none; }
+  .ab-src { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; flex: none; font-family: var(--font-label); }
+  .ab-t { font-size: 18px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 45%; }
+  .ab-d { font-size: 15px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .ab-go { margin-left: auto; flex: none; font-size: 14px; font-weight: 700; color: var(--blue); }
+  .ab-n, .ab-x { flex: none; background: var(--panel); border: 0; border-radius: var(--r); color: var(--muted); font-size: 15px; font-weight: 700; min-width: 58px; padding: 0 12px; }
+  .ab-x { font-size: 18px; }
   .gear { position: fixed; bottom: 18px; right: 22px; background: none; border: 0; color: var(--dim); font-size: 20px; padding: 4px; z-index: 5; min-width: 44px; min-height: 44px; }
 
   /* ---------- setup ---------- */
@@ -512,6 +527,11 @@
 </style>
 </head>
 <body>
+<div id="alertbar" hidden role="status" aria-live="polite">
+  <button class="ab-main" id="abmain"><span class="ab-ic" id="abic"></span><span class="ab-src" id="absrc"></span><span class="ab-t" id="abt"></span><span class="ab-d" id="abd"></span><span class="ab-go" id="abgo"></span></button>
+  <button class="ab-n" id="abn" aria-label="Next alert"></button>
+  <button class="ab-x" id="abx" aria-label="Dismiss this alert">✕</button>
+</div>
 <div class="grid">
   <!-- CALENDAR -->
   <section class="panel" id="cal">
@@ -702,6 +722,19 @@
     <div class="hint">Claude Code and Codex can fill that card automatically: see "AI task card" in the README.</div>
       </div>
     </details>
+    <details class="sec" data-sec="alerts">
+      <summary><span class="car"></span>Alerts<span class="sub">The bar across the top of the Edge</span></summary>
+      <div class="secb">
+    <div class="hint" style="margin:0 0 10px">Time-sensitive things show in a bar across the top of the Edge. Tap it to open, ✕ to dismiss, and the number to see the next one.</div>
+    <label class="chk"><input type="checkbox" data-alert="meeting"> A meeting starts in 10 minutes (with a Join button for video calls)</label>
+    <label class="chk"><input type="checkbox" data-alert="claude"> Claude is waiting on you</label>
+    <label class="chk"><input type="checkbox" data-alert="rain"> Rain is likely within the next two hours</label>
+    <label class="chk"><input type="checkbox" data-alert="people"> A new text from someone below</label>
+    <div class="fld" style="margin:6px 0 10px 32px"><input id="alertPeople" spellcheck="false" placeholder="Names, comma separated, e.g. Katie, Candice"></div>
+    <label class="chk"><input type="checkbox" data-alert="claude_feed"> Alerts from Claude's hourly check: new Upwork gigs, new leads and items on your dashboard, client site flags</label>
+    <div class="hint" id="alertFeedNote"></div>
+      </div>
+    </details>
     <details class="sec" data-sec="display">
       <summary><span class="car"></span>Display<span class="sub">Full screen, restart</span></summary>
       <div class="secb">
@@ -775,7 +808,7 @@ function applyLayout() {
     }
   });
   if (SETTINGS_PAGE) return;     // the settings tab shows no panels
-  loadBadges(); loadReminders(false); loadWeather(); renderActions(); loadLights(); hkSig = ""; loadHotkeys();
+  loadBadges(); loadReminders(false); loadWeather(); renderActions(); loadLights(); hkSig = ""; loadHotkeys(); loadAlerts();
   applyAi();
   applyMusicMode();
 }
@@ -1068,6 +1101,7 @@ async function loadMessages() {
     return;
   }
   const list = d.conversations || [];
+  convList = list;
   const unread = list.reduce((t, c) => t + c.unread, 0);
   $("msgcount").textContent = unread ? unread + " unread" : "";
   const sig = JSON.stringify(list);
@@ -1487,6 +1521,7 @@ async function loadService() {
 async function loadTask() {
   let s;
   try { s = await (await fetch("/api/claude")).json(); } catch (e) { return; }
+  taskData = s;
   const state = s.state || "idle";
   const upd = s.updated ? new Date(s.updated) : null;
   const stale = upd && Date.now() - upd > 2 * 3600 * 1000;
@@ -1526,7 +1561,7 @@ const WX = c => c === 0 ? ["☀️", "Clear"] : c === 1 ? ["🌤️", "Mostly cl
 const wxIcon = (c, day) => (!day && (c === 0 || c === 1)) ? "🌙" : WX(c)[0];
 const hourLabel = t => { const h = +t.slice(11, 13); return h === 0 ? "12a" : h < 12 ? h + "a" : h === 12 ? "12p" : (h - 12) + "p"; };
 const RAINY = c => (c >= 51 && c <= 67) || (c >= 80 && c <= 82) || c >= 95 || (c >= 71 && c <= 77) || c === 85 || c === 86;
-let wxLast = 0;
+let wxLast = 0, wxData = null, convList = [], taskData = null;
 async function loadWeather() {
   if (!panelOn("weather")) return;
   wxLast = Date.now();
@@ -1537,6 +1572,7 @@ async function loadWeather() {
     box.innerHTML = `<div class="empty">${d.error === "no_location" ? "Choose your town in ⚙︎ settings." : "Weather is unavailable right now."}</div>`;
     $("wxplace").textContent = ""; return;
   }
+  wxData = d;
   const cur = d.current || {}, H = d.hourly || {}, D = d.daily || {}, deg = "°";
   $("wxplace").textContent = (d.name || "").split(",").slice(0, 2).join(",");
   const [ic, cond] = WX(cur.weather_code);
@@ -1792,6 +1828,84 @@ function collectHotkeys() {
       value: r.querySelector(".vv").value, enter: !!(r.querySelector(".en") && r.querySelector(".en").checked) })).filter(b => b.value.trim())
   })).filter(p => p.app);
 }
+
+/* =========================================================
+   ALERTS: a bar across the top for time-sensitive things
+   ========================================================= */
+const AB_ICON = { Calendar: "📅", Claude: "✳️", Weather: "🌧️", Messages: "💬", Upwork: "💼", Dashboard: "📊", Site: "🌐", Mercor: "🧠", Email: "✉️", Jobs: "💼" };
+let abList = [], abIdx = 0, abDismissed = new Set(), abSig = "";
+function localAlerts() {
+  const on = Object.assign({ meeting: true, claude: true, rain: true, people: true }, prefs.alerts || {});
+  const out = [], now = Date.now();
+  if (on.meeting) for (const e of events || []) {
+    if (e.allDay || !e.start) continue;
+    const mins = Math.round((e.start.getTime() - now) / 60000);
+    if (mins <= 10 && mins >= -3) out.push({ id: "meet:" + e.title + ":" + e.start.getTime(), source: "Calendar", level: "high",
+      title: e.title, detail: mins > 0 ? `starts in ${mins} min` + (e.loc ? " · " + e.loc : "") : "starting now", url: e.join || "", go: e.join ? "Join" : "" });
+  }
+  if (on.claude && taskData && taskData.state === "waiting" && taskData.updated && now - new Date(taskData.updated) < 2 * 3600e3)
+    out.push({ id: "claude:" + taskData.updated, source: "Claude", level: "high", title: "Claude is waiting on you", detail: [taskData.task, taskData.detail].filter(Boolean).join(" · ") });
+  if (on.rain && wxData && wxData.ok && wxData.hourly && wxData.hourly.time) {
+    const H = wxData.hourly, cur = String((wxData.current || {}).time || "").slice(0, 13);
+    const i0 = H.time.findIndex(t => t.slice(0, 13) >= cur);
+    for (let i = i0 + 1; i0 >= 0 && i <= i0 + 2 && i < H.time.length; i++) {
+      if ((H.precipitation_probability[i] || 0) >= 60 && !RAINY((wxData.current || {}).weather_code)) {
+        out.push({ id: "rain:" + H.time[i], source: "Weather", level: "info", title: `Rain likely around ${hourLabel(H.time[i]).replace("a", " AM").replace("p", " PM")}`, detail: `${H.precipitation_probability[i]}% chance` });
+        break;
+      }
+    }
+  }
+  const people = (prefs.alertPeople || []).map(x => x.toLowerCase()).filter(Boolean);
+  if (on.people && people.length) for (const c of convList || []) {
+    if (!c.unread || !people.some(p => c.name.toLowerCase().includes(p))) continue;
+    const last = [...c.lines].reverse().find(l => !l.mine);
+    out.push({ id: "text:" + c.chat + ":" + c.time, source: "Messages", level: "high", title: c.name, detail: last ? last.text : "New message", msg: c.open, go: "Open" });
+  }
+  return out;
+}
+async function loadAlerts() {
+  if (SETTINGS_PAGE) return;
+  let feed = [];
+  try {
+    const d = await (await fetch("/api/alerts")).json();
+    abDismissed = new Set(d.dismissed || []);
+    if ((prefs.alerts || {}).claude_feed !== false) feed = (d.alerts || []).map(a => Object.assign({ go: a.url ? "Open" : "" }, a));
+  } catch (e) {}
+  const all = localAlerts().concat(feed).filter(a => !abDismissed.has(a.id));
+  all.sort((a, b) => (b.level === "high") - (a.level === "high"));
+  const sig = all.map(a => a.id).join("|");
+  if (sig !== abSig) { abSig = sig; const keep = abList[abIdx] && abList[abIdx].id; abList = all; abIdx = Math.max(0, all.findIndex(a => a.id === keep)); }
+  else abList = all;
+  drawAlert();
+}
+function drawAlert() {
+  const bar = $("alertbar"), a = abList[abIdx];
+  const show = !!a;
+  if (bar.hidden === show) { bar.hidden = !show; document.body.classList.toggle("has-alert", show); }
+  if (!a) return;
+  bar.classList.toggle("high", a.level === "high");
+  $("abic").textContent = AB_ICON[a.source] || "🔔";
+  $("absrc").textContent = a.source || "Alert";
+  $("abt").textContent = a.title;
+  $("abd").textContent = a.detail || "";
+  $("abgo").textContent = a.go ? a.go + " ›" : "";
+  $("abn").textContent = abList.length > 1 ? (abIdx + 1) + " / " + abList.length : "";
+  $("abn").style.display = abList.length > 1 ? "" : "none";
+}
+$("abn").onclick = () => { abIdx = (abIdx + 1) % abList.length; drawAlert(); };
+$("abx").onclick = () => {
+  const a = abList[abIdx]; if (!a) return;
+  abDismissed.add(a.id); abList.splice(abIdx, 1); abIdx = 0; drawAlert();
+  macOpen({ kind: "alert-dismiss", id: a.id });
+};
+$("abmain").onclick = () => {
+  const a = abList[abIdx]; if (!a) return;
+  if (a.msg) macOpen({ kind: "message", id: a.msg }, $("abmain"));
+  else if (a.url) macOpen({ kind: "alert-open", url: a.url }, $("abmain"));
+};
+setInterval(() => { if (abList.length > 1) { abIdx = (abIdx + 1) % abList.length; drawAlert(); } }, 9000);
+setInterval(loadAlerts, 20000);
+setTimeout(loadAlerts, 3000);
 
 /* settings: weather location and the action list */
 let wxDraft = null;
@@ -2115,6 +2229,12 @@ async function openSetup() {
   wxDraft = prefs.weather && prefs.weather.lat != null ? Object.assign({}, prefs.weather) : null;
   $("wxUnits").value = (prefs.weather && prefs.weather.units) || "f"; showWxCur(); $("wxRes").innerHTML = "";
   lightRooms = null; loadActionRows(); loadHotkeyRows();
+  const al = Object.assign({ meeting: true, claude: true, rain: true, people: true, claude_feed: true }, prefs.alerts || {});
+  document.querySelectorAll("[data-alert]").forEach(i => i.checked = al[i.dataset.alert] !== false);
+  $("alertPeople").value = (prefs.alertPeople || []).join(", ");
+  fetch("/api/alerts").then(r => r.json()).then(d => {
+    $("alertFeedNote").textContent = d.updated ? "Claude's last check: " + new Date(d.updated).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) + " · " + d.alerts.length + " open" : "Claude's hourly check hasn't run yet.";
+  }).catch(() => {});
   loadRemRows();
   loadLightRows();
   $("savedmsg").textContent = "";
@@ -2153,6 +2273,8 @@ $("save").onclick = async () => {
     actions: collectActions(),
     lights: collectLights(),
     hotkeys: collectHotkeys(),
+    alerts: Object.fromEntries([...document.querySelectorAll("[data-alert]")].map(i => [i.dataset.alert, i.checked])),
+    alertPeople: $("alertPeople").value.split(",").map(x => x.trim()).filter(Boolean),
     hiddenRemLists: document.querySelector("#remrows input[data-remlist]")
       ? [...document.querySelectorAll("#remrows input[data-remlist]")].filter(i => !i.checked).map(i => i.dataset.remlist)
       : (prefs.hiddenRemLists || []),

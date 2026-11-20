@@ -5,6 +5,7 @@ Serves the dashboard at http://127.0.0.1:8888 (only reachable from this Mac),
 fetches your calendar feeds, reads recent iMessages, and serves Claude's
 status file. Uses only the Python standard library.
 """
+import datetime
 import glob
 import json
 import os
@@ -682,6 +683,68 @@ def app_menus(app):
     return {"ok": True, "app": app, "items": items[:400]}
 
 
+# ---------------- Alerts ----------------
+# alerts.json in this folder is written by Claude's hourly "Command Center alerts" task
+# (new Upwork gigs, dashboard items, client-site flags). The Edge adds its own alerts
+# (meeting soon, Claude waiting, rain, texts from chosen people). Dismissed ids are kept
+# in alerts-dismissed.json for a week.
+ALERTS_FILE = os.path.join(ROOT, "alerts.json")
+DISMISSED_FILE = os.path.join(ROOT, "alerts-dismissed.json")
+
+
+def _parse_time(v):
+    try:
+        return datetime.datetime.fromisoformat(str(v).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def _dismissed():
+    try:
+        with open(DISMISSED_FILE) as f:
+            d = json.load(f)
+        return {k: v for k, v in d.items() if time.time() - float(v) < 7 * 86400}
+    except Exception:
+        return {}
+
+
+def file_alerts():
+    try:
+        with open(ALERTS_FILE) as f:
+            raw = json.load(f)
+    except Exception:
+        return [], None
+    items = raw.get("alerts", []) if isinstance(raw, dict) else []
+    now, gone, out = time.time(), _dismissed(), []
+    for a in items[:40]:
+        if not isinstance(a, dict) or not a.get("id") or not a.get("title"):
+            continue
+        aid = str(a["id"])[:120]
+        exp = _parse_time(a.get("expires")) if a.get("expires") else None
+        if aid in gone or (exp and exp < now):
+            continue
+        url = str(a.get("url", ""))
+        out.append({"id": aid, "source": str(a.get("source", ""))[:30], "title": str(a["title"])[:140],
+                    "detail": str(a.get("detail", ""))[:240], "url": url if url.startswith("https://") else "",
+                    "level": "high" if a.get("level") == "high" else "info", "time": str(a.get("time", ""))[:40]})
+    return out, (raw.get("updated") if isinstance(raw, dict) else None)
+
+
+def alerts_view():
+    items, updated = file_alerts()
+    return {"ok": True, "alerts": items, "updated": updated, "dismissed": list(_dismissed().keys())}
+
+
+def dismiss_alert(aid):
+    d = _dismissed()
+    d[str(aid)[:120]] = time.time()
+    tmp = DISMISSED_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(d, f)
+    os.replace(tmp, DISMISSED_FILE)
+    return True
+
+
 def hotkey_view():
     f = front_app()
     p = hotkey_profile(f["app"], f["title"])
@@ -946,7 +1009,8 @@ DEFAULT_PREFS = {"spotifyClientId": "", "speaker": "office speakers", "fullscree
                  "calSource": "links", "hiddenCals": [], "tiles": {}, "hiddenRemLists": [],
                  "weather": {"name": "", "lat": None, "lon": None, "units": "f"},
                  "actions": DEFAULT_ACTIONS, "lights": {"hidden": [], "rooms": {}}, "hotkeys": DEFAULT_HOTKEYS,
-                 "theme": "default"}
+                 "theme": "default", "alertPeople": [],
+                 "alerts": {"meeting": True, "claude": True, "rain": True, "people": True, "claude_feed": True}}
 
 
 def get_prefs():
@@ -985,6 +1049,11 @@ def get_prefs():
                                 "units": "c" if w.get("units") == "c" else "f"}
         except (TypeError, ValueError):
             p["weather"] = dict(p["weather"], units="c" if w.get("units") == "c" else "f")
+    if isinstance(saved.get("alertPeople"), list):
+        p["alertPeople"] = [str(x).strip()[:40] for x in saved["alertPeople"] if str(x).strip()][:20]
+    if isinstance(saved.get("alerts"), dict):
+        a = saved["alerts"]
+        p["alerts"] = {k: bool(a.get(k, True)) for k in ("meeting", "claude", "rain", "people", "claude_feed")}
     if saved.get("theme") in ("default", "auto", "bridge", "hud", "pitwall", "daylight", "darkside", "lightside"):
         p["theme"] = saved["theme"]
     if isinstance(saved.get("hotkeys"), list):
@@ -1703,6 +1772,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self._json(reminders_shown(force=q.get("force") == ["1"], show_all=q.get("all") == ["1"]))
         if p == "/api/hotkeys":
             return self._json(hotkey_view())
+        if p == "/api/alerts":
+            return self._json(alerts_view())
         if p == "/api/menus":
             return self._json(app_menus(parse_qs(u.query).get("app", [""])[0]))
         if p == "/api/lights":
@@ -1780,6 +1851,15 @@ class Handler(SimpleHTTPRequestHandler):
                         ok = mac_open((["-a", "Google Chrome"] if chrome else []) + [target])
                     else:
                         ok = mac_open(["-a", target or name])
+                elif kind == "alert-dismiss":
+                    ok = dismiss_alert(body.get("id", ""))
+                elif kind == "alert-open":
+                    # only links that are in the current alerts file (or a meeting link the Edge found)
+                    url = str(body.get("url", ""))
+                    known = {a["url"] for a in file_alerts()[0] if a["url"]}
+                    ok = url.startswith("https://") and (url in known or urlparse(url).hostname in MEETING_HOSTS or
+                                                          any((urlparse(url).hostname or "").endswith("." + h) for h in MEETING_HOSTS))
+                    ok = ok and mac_open([url])
                 elif kind == "hotkey":
                     ok = run_hotkey(int(body.get("i", -1)), str(body.get("label", "")), bool(body.get("pinned")))
                 elif kind == "weather-app":
@@ -1876,7 +1956,7 @@ class Handler(SimpleHTTPRequestHandler):
             if isinstance(body.get("prefs"), dict):
                 np = dict(cfg.get("prefs") or {})
                 for k in ("spotifyClientId", "speaker", "fullscreen", "msgNames", "badges", "badgeApps",
-                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights", "hotkeys", "theme"):
+                          "calSource", "hiddenCals", "tiles", "weather", "actions", "hiddenRemLists", "lights", "hotkeys", "theme", "alertPeople", "alerts"):
                     if k in body["prefs"]:
                         np[k] = body["prefs"][k]
                 if body["prefs"].get("spotifyReset"):

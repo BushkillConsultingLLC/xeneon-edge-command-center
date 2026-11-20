@@ -102,6 +102,19 @@ Messages history lives in a protected database. Give access once: *System Settin
 
 Heads up: the panel shows message text, including verification codes, to anyone who can see your desk.
 
+## Alert bar
+
+Time-sensitive things show in a bar across the top of the Edge. Tap it to open the item, tap ✕ to dismiss it, and tap the counter to see the next one (it also rotates on its own). Urgent alerts get a red edge. When there is nothing to show, the bar disappears and the panels take the full height.
+
+The Command Center raises these by itself, and each can be turned off in settings → Alerts:
+
+- a meeting starting in the next 10 minutes, with a Join button for video calls
+- your AI assistant waiting on you (from the task card)
+- rain likely in the next two hours
+- a new text from people you name
+
+Anything else can add alerts by writing `alerts.json` in the app folder, for example a scheduled AI task that checks new freelance postings or a site's analytics. See `alerts.example.json`. Each alert needs an `id`; `level` is `high` or `info`; `url` must be an https link; alerts past their `expires` time are skipped. Dismissed ids are remembered for a week, so keep an alert's id the same each time you write the file. The bar only opens links that are in the current file or on known video-meeting hosts.
+
 ## AI task card
 
 The task card shows what your assistant is doing right now: the request, the last few steps ("Reading index.html", "Editing app.js", "Push the change to GitHub") and whether it is working, waiting on you, or done.
@@ -136,7 +149,7 @@ Anything can drive the card by writing `claude-status.json` in the app folder: a
 
 ## How it works
 
-- `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888`, rejects requests with any other `Host` header, and refuses write requests from other websites open in the browser (Origin, Fetch-Metadata and JSON content-type checks). Taps that open apps go through the server's `/api/open`, which only opens Messages conversations, calendar days for your configured feeds, and links on known video-meeting hosts.
+- `server.py`: Python standard library only. It serves the page, fetches your ICS feeds server-side (calendar hosts don't allow browser cross-origin requests), reads `~/Library/Messages/chat.db` and your Contacts database read-only, and serves the status file. It binds to `127.0.0.1:8888`, rejects requests with any other `Host` header, and refuses write requests from other websites open in the browser (Origin, Fetch-Metadata and JSON content-type checks). Taps that open apps go through the server's `/api/open`, which only opens Messages conversations, calendar days for your configured feeds, links on known video-meeting hosts, and links listed in `alerts.json`.
 - `index.html`: the whole UI in one file, with no build step. Calendars are parsed with [ical.js](https://github.com/kewisch/ical.js) (bundled as `ical.min.js`, MPL-2.0).
 - `ai-status-hook.py`: the Claude Code hook / Codex notify program that writes the task card. Standard library only, never blocks the assistant, always exits 0.
 - **Start / Stop Command Center.command**: start the server and open a dedicated Chrome app window (separate profile at `~/Library/Application Support/CommandCenterChrome`), or stop both.
