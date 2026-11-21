@@ -12,3 +12,5 @@ govee-debug.txt
 alerts.json
 alerts.json.tmp
 alerts-dismissed.json
+claude-watch
+claude-app-debug.txt

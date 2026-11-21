@@ -13,6 +13,7 @@ import plistlib
 import re
 import sqlite3
 import subprocess
+import threading
 import time
 import uuid
 import urllib.error
@@ -1108,6 +1109,72 @@ def osa(script, timeout=4):
         return False, "", str(e)
 
 
+# ---------------- Claude desktop app watcher ----------------
+# The Claude app has no hooks, so watch its window: a Stop button means it is working.
+CLAUDE_WATCH = os.path.join(ROOT, "claude-watch")
+_cw = {"state": "", "task": "", "since": 0, "updated": 0, "gone": 0, "dbg": 0}
+
+
+def _claude_watch_loop():
+    while True:
+        try:
+            if os.path.exists(CLAUDE_WATCH):
+                r = subprocess.run([CLAUDE_WATCH], capture_output=True, text=True, timeout=10)
+                d = json.loads(r.stdout or "{}")
+                now = time.time()
+                title = next((t for t in d.get("windows", []) if t and t != "Claude"), "") if d.get("running") else ""
+                title = re.sub(r"\s*[-–—|]\s*Claude$", "", title).strip()
+                if d.get("waiting"):
+                    if _cw["state"] != "waiting":
+                        _cw.update(state="waiting", updated=now)
+                    _cw["task"] = title or _cw["task"]; _cw["gone"] = 0
+                elif d.get("working"):
+                    if _cw["state"] != "working":
+                        _cw.update(state="working", since=now, updated=now)
+                    _cw["task"] = title or _cw["task"]; _cw["gone"] = 0
+                elif _cw["state"] in ("working", "waiting"):
+                    _cw["gone"] += 1
+                    if _cw["gone"] >= 2:          # gone for two checks in a row: finished
+                        _cw.update(state="done", updated=now)
+                if now - _cw["dbg"] > 30:
+                    _cw["dbg"] = now
+                    with open(os.path.join(ROOT, "claude-app-debug.txt"), "w") as f:
+                        f.write(time.strftime("%Y-%m-%d %H:%M:%S") + "\n" + json.dumps(d)[:6000] + "\nstate: " + json.dumps({k: _cw[k] for k in ("state", "task")}) + "\n" + (r.stderr or "")[:500])
+        except Exception as e:
+            try:
+                with open(os.path.join(ROOT, "claude-app-debug.txt"), "w") as f:
+                    f.write("error: " + str(e)[:500])
+            except Exception:
+                pass
+        time.sleep(5)
+
+
+def claude_status_view():
+    """The task card: whichever is newer, the status file (Claude Code hooks, scripts)
+    or what the Claude desktop app is visibly doing."""
+    try:
+        with open(os.path.join(ROOT, "claude-status.json")) as f:
+            fs = json.load(f)
+    except Exception:
+        fs = {"state": "idle"}
+    if not _cw["state"]:
+        return fs
+    try:
+        f_t = datetime.datetime.fromisoformat(str(fs.get("updated", "")).replace("Z", "+00:00")).timestamp()
+    except Exception:
+        f_t = 0
+    # a file that is being actively written wins while the app is idle
+    if f_t > _cw["updated"] and not (_cw["state"] in ("working", "waiting") and fs.get("state") in ("done", "idle")):
+        return fs
+    st = _cw["state"]
+    mins = int((time.time() - _cw["since"]) // 60) if _cw["since"] else 0
+    detail = {"working": "In the Claude app" + (f", {mins} min so far" if mins else ""),
+              "waiting": "The Claude app is asking for your OK",
+              "done": "Finished in the Claude app"}[st]
+    return {"state": st, "task": _cw["task"] or "Claude app", "detail": detail, "steps": [], "source": "Claude app",
+            "updated": datetime.datetime.fromtimestamp(_cw["updated"], datetime.timezone.utc).isoformat()}
+
+
 def music_state():
     ok, out, _ = osa('application "Music" is running')
     if not ok:
@@ -1805,11 +1872,7 @@ class Handler(SimpleHTTPRequestHandler):
                     out.append({"key": k, "card": "", "override": ov.get(k, ""), "hidden": k in hid})
             return self._json({"ok": d.get("ok", False), "senders": out[:20]})
         if p == "/api/claude":
-            try:
-                with open(os.path.join(ROOT, "claude-status.json")) as f:
-                    return self._json(json.load(f))
-            except Exception:
-                return self._json({"state": "idle"})
+            return self._json(claude_status_view())
         if p.endswith((".py", ".json", ".log", ".command", ".plist")):
             self.send_error(404)
             return
@@ -1979,6 +2042,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    threading.Thread(target=_claude_watch_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print("Command Center running at http://127.0.0.1:%d" % PORT)
     srv.serve_forever()

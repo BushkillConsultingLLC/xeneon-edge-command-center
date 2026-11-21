@@ -16,6 +16,13 @@ if [ -f "$DIR/cal-helper.swift" ] && { [ ! -x "$DIR/cal-helper" ] || [ "$DIR/cal
   fi
 fi
 
+# Build the Claude app watcher for the task card (first time or after an update)
+if [ -f "$DIR/claude-watch.swift" ] && { [ ! -x "$DIR/claude-watch" ] || [ "$DIR/claude-watch.swift" -nt "$DIR/claude-watch" ]; }; then
+  echo "Setting up the Claude app watcher (first time only)..."
+  xcrun swiftc -O "$DIR/claude-watch.swift" -o "$DIR/claude-watch" >> "$HOME/Library/Logs/CommandCenter-build.log" 2>&1 \
+    || echo "Couldn't build it (details: ~/Library/Logs/CommandCenter-build.log). The task card still works with Claude Code."
+fi
+
 # Always start a fresh server, so an update takes effect every time this runs
 pkill -f "$DIR/server.py" 2>/dev/null
 for i in 1 2 3 4 5 6; do
