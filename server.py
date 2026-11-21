@@ -1343,6 +1343,8 @@ def unread_fallback(name, dock_names=()):
             return "" if out.strip() == "0" else out.strip()
         return None
     procs = [name] + (["Google Chrome"] if name == "Gmail" else [])
+    # minimized windows show up as Dock items named after the window, e.g. "Gmail - Inbox (3) - you@gmail.com - Gmail"
+    out = "\n".join(n for n in dock_names if "Inbox" in n and (name == "Gmail" or name in n))
     if name == "Gmail":
         # every tab of your own Chrome, read in the background so the panel never waits on it
         if not _gmail_tabs["busy"] and time.time() - _gmail_tabs["t"] > (120 if _gmail_tabs["fail"] else 20):
@@ -1351,8 +1353,6 @@ def unread_fallback(name, dock_names=()):
         _fallback_debug["Gmail/tabs"] = _gmail_tabs["note"][:300]
         if time.time() - _gmail_tabs["t"] < 180:
             out += "\n" + _gmail_tabs["out"]
-    # minimized windows show up as Dock items named after the window, e.g. "Gmail - Inbox (3) - you@gmail.com - Gmail"
-    out = "\n".join(n for n in dock_names if "Inbox" in n and (name == "Gmail" or name in n))
     for proc in procs:
         proc = proc.replace('"', '')
         ok, o, _ = osa('tell application "System Events" to if exists process "%s" then return name of every window of process "%s"'
