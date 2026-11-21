@@ -1247,6 +1247,13 @@ def unread_fallback(name, dock_names=()):
             return "" if out.strip() == "0" else out.strip()
         return None
     procs = [name] + (["Google Chrome"] if name == "Gmail" else [])
+    if name == "Gmail" and _lsappinfo(["find", "name=Google Chrome"]).strip():
+        # every Chrome tab, not just the one in front (a window's title only shows its active tab)
+        ok, o, _ = osa('set out to ""\ntell application "Google Chrome"\nrepeat with w in windows\nrepeat with t in tabs of w\n'
+                       'set out to out & (title of t) & linefeed\nend repeat\nend repeat\nend tell\nreturn out', timeout=4)
+        _fallback_debug["Gmail/tabs"] = (o if ok else "error: " + _)[:300]
+        if ok:
+            out += "\n" + o
     # minimized windows show up as Dock items named after the window, e.g. "Gmail - Inbox (3) - you@gmail.com - Gmail"
     out = "\n".join(n for n in dock_names if "Inbox" in n and (name == "Gmail" or name in n))
     for proc in procs:
@@ -1258,7 +1265,7 @@ def unread_fallback(name, dock_names=()):
         _fallback_debug[name + "/" + proc] = (o if ok else "error")[:300]
     if name == "Gmail":
         # only personal Gmail windows ("Inbox (3) - you@gmail.com - Gmail"), not Workspace accounts
-        out = "\n".join(re.findall(r"Inbox[^,\n]*?@(?:gmail|googlemail)\.com", out))
+        out = "\n".join(re.findall(r"Inbox[^\n]*?@(?:gmail|googlemail)\.com", out))
     m = re.search(r"\bInbox \((\d[\d,]*)\)", out)
     if m:
         _unread_memo[name] = (time.time(), m.group(1).replace(",", ""))
@@ -1282,7 +1289,7 @@ def badges():
         note = "dock_permission" if ("-1719" in err or "-25211" in err or "assistive" in err.lower()) else "dock_error"
     out = []
     for name in apps:
-        running = bool(_lsappinfo(["find", "name=" + name]).strip()) or bool(labels and labels.get(name))
+        running = bool(_lsappinfo(["find", "name=" + ("Google Chrome" if name == "Gmail" else name)]).strip()) or bool(labels and labels.get(name))
         label = (labels or {}).get(name, "") if running else ""
         if running and not label:
             alt = unread_fallback(name, list((labels or {}).keys()))

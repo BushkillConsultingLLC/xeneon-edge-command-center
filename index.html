@@ -1077,7 +1077,8 @@ $("cal").addEventListener("click", ev => {
   const e = events[+b.dataset.ev];
   if (e) macOpen({ kind: "calendar", cal: e.calIdx, date: ymd(e.start) }, b);
 });
-setInterval(loadCalendars, 5 * 60000);   // first load happens once settings arrive setInterval(renderCal, 30000);
+setInterval(loadCalendars, 2 * 60000);   // first load happens once settings arrive
+setInterval(renderCal, 30000);            // keeps "Now / Next", the countdown and the day current
 
 /* =========================================================
    MESSAGES
