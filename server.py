@@ -1304,6 +1304,35 @@ _unread_memo = {}
 _fallback_debug = {}
 
 
+_gmail_tabs = {"t": 0, "out": "", "busy": False, "fail": 0, "note": "not read yet"}
+
+
+def _read_chrome_tabs():
+    try:
+        r = subprocess.run(["/bin/ps", "-axo", "pid=,args="], capture_output=True, text=True, timeout=5)
+        pid = None
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if "/Google Chrome.app/Contents/MacOS/Google Chrome" in line and "--type=" not in line and "CommandCenterChrome" not in line:
+                pid = int(line.split(None, 1)[0])
+                break
+        if not pid:
+            _gmail_tabs.update(t=time.time(), out="", fail=0, note="your Chrome isn't open")
+            return
+        js = ("var c = Application(%d), out = [];"
+              "c.windows().forEach(function (w) { w.tabs().forEach(function (t) { out.push(t.title()); }); });"
+              "out.join('\\n');") % pid
+        r = subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", js], capture_output=True, text=True, timeout=15)
+        if r.returncode == 0:
+            _gmail_tabs.update(t=time.time(), out=r.stdout, fail=0, note="ok, %d tabs" % len(r.stdout.splitlines()))
+        else:
+            _gmail_tabs.update(t=time.time(), fail=1, note="error: " + (r.stderr or "")[:200])
+    except Exception as e:
+        _gmail_tabs.update(t=time.time(), fail=1, note="error: " + str(e)[:200])
+    finally:
+        _gmail_tabs["busy"] = False
+
+
 def unread_fallback(name, dock_names=()):
     """When an app shows no Dock badge, ask it another way.
     Mail: its own unread count for every inbox (asks once for Automation permission).
@@ -1314,13 +1343,14 @@ def unread_fallback(name, dock_names=()):
             return "" if out.strip() == "0" else out.strip()
         return None
     procs = [name] + (["Google Chrome"] if name == "Gmail" else [])
-    if name == "Gmail" and _lsappinfo(["find", "name=Google Chrome"]).strip():
-        # every Chrome tab, not just the one in front (a window's title only shows its active tab)
-        ok, o, _ = osa('set out to ""\ntell application "Google Chrome"\nrepeat with w in windows\nrepeat with t in tabs of w\n'
-                       'set out to out & (title of t) & linefeed\nend repeat\nend repeat\nend tell\nreturn out', timeout=4)
-        _fallback_debug["Gmail/tabs"] = (o if ok else "error: " + _)[:300]
-        if ok:
-            out += "\n" + o
+    if name == "Gmail":
+        # every tab of your own Chrome, read in the background so the panel never waits on it
+        if not _gmail_tabs["busy"] and time.time() - _gmail_tabs["t"] > (120 if _gmail_tabs["fail"] else 20):
+            _gmail_tabs["busy"] = True
+            threading.Thread(target=_read_chrome_tabs, daemon=True).start()
+        _fallback_debug["Gmail/tabs"] = _gmail_tabs["note"][:300]
+        if time.time() - _gmail_tabs["t"] < 180:
+            out += "\n" + _gmail_tabs["out"]
     # minimized windows show up as Dock items named after the window, e.g. "Gmail - Inbox (3) - you@gmail.com - Gmail"
     out = "\n".join(n for n in dock_names if "Inbox" in n and (name == "Gmail" or name in n))
     for proc in procs:
@@ -1736,8 +1766,28 @@ def fetch_ics(index):
         if hit:
             return hit[1], 200
         return None, 502
+    text = drop_declined(text)
     _ics_cache[index] = (time.time(), text, cals[index]["url"])
     return text, 200
+
+
+def drop_declined(text):
+    """Google's calendar links still include events the owner declined. Leave those out."""
+    text = re.sub(r"\r?\n[ \t]", "", text)              # unfold long lines
+    owner = set(m.lower() for m in re.findall(r"^X-WR-CALNAME:\s*([^\s@]+@[^\s]+)\s*$", text, re.M))
+    owner |= set(m.lower() for m in re.findall(r"^UID:[^\n]*_([^\s_@]+@[^\s]+?)\s*$", text, re.M))
+    if not owner:
+        return text
+
+    def keep(m):
+        ev = m.group(0)
+        for line in re.findall(r"^ATTENDEE[^\n]*$", ev, re.M):
+            if "PARTSTAT=DECLINED" in line:
+                em = re.search(r"mailto:([^\s;]+)", line, re.I)
+                if em and em.group(1).strip().lower() in owner:
+                    return ""
+        return ev
+    return re.sub(r"BEGIN:VEVENT.*?END:VEVENT\r?\n?", keep, text, flags=re.S)
 
 
 class Handler(SimpleHTTPRequestHandler):

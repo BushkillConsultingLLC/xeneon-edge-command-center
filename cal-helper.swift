@@ -36,6 +36,8 @@ func readEvents() -> Never {
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: cals)
         for e in store.events(matching: predicate) {
             if e.status == .canceled { continue }
+            // events you declined still come through; leave them off the agenda
+            if let att = e.attendees, att.contains(where: { $0.isCurrentUser && $0.participantStatus == .declined }) { continue }
             events.append([
                 "title": e.title ?? "",
                 "start": iso.string(from: e.startDate),
